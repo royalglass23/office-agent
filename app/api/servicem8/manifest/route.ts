@@ -7,7 +7,7 @@ export function GET() {
   return Response.json({
     $schema: "https://api.servicem8.com/api_1.0/addonsdk/manifest-schema/v1.json",
     name: "RG Office Assistant",
-    version: "0.1.0",
+    version: "0.1.1",
     oauth: { scope: getConfig().oauthScopes },
     actions: [
       {
@@ -16,7 +16,7 @@ export function GET() {
         entity: "job",
         event: "rg_office_assistant",
         location: "modal",
-        iconURL: new URL("/icon.svg", base).toString(),
+        iconURL: new URL("/icon.png", base).toString(),
       },
     ],
   });
