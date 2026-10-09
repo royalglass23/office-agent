@@ -94,7 +94,10 @@ describe("ServiceM8 event route", () => {
     expect(clientConstructor).toHaveBeenCalledWith(event.auth.accountUUID, event.auth.staffUUID);
     expect(requireVendorAccount).toHaveBeenCalledOnce();
     expect(loadPhaseZeroJobContext).toHaveBeenCalledWith(expect.anything(), event.eventArgs.jobUUID);
-    expect(await response.text()).toContain("Q123");
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toMatchObject({
+      eventResponse: expect.stringContaining("Q123"),
+    });
   });
 
   it("rejects unexpected callback content types", async () => {
