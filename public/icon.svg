@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="RG Office Assistant">
+  <rect width="256" height="256" rx="48" fill="#0d1b2a"/>
+  <path d="M54 64h84c35 0 58 18 58 50 0 22-12 38-32 46l38 32h-43l-31-27H91v27H54V64Zm37 32v38h44c14 0 23-7 23-19s-9-19-23-19H91Z" fill="#fff"/>
+</svg>
