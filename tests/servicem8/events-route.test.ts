@@ -100,12 +100,24 @@ describe("ServiceM8 event route", () => {
     });
   });
 
-  it("rejects unexpected callback content types", async () => {
+  it("accepts a valid signed callback regardless of its declared media type", async () => {
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: await signFresh(),
+    }));
+    expect(response.status).toBe(200);
+    expect(clientConstructor).toHaveBeenCalledWith(event.auth.accountUUID, event.auth.staffUUID);
+  });
+
+  it("rejects a malformed callback body before storage or API access", async () => {
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{}",
     }));
-    expect(response.status).toBe(415);
+    expect(response.status).toBe(401);
+    expect(consumeEventHash).not.toHaveBeenCalled();
+    expect(clientConstructor).not.toHaveBeenCalled();
   });
 });

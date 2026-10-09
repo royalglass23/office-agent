@@ -22,11 +22,6 @@ function addonResponse(body: string, status = 200) {
 
 export async function POST(request: Request) {
   const requestId = correlationId();
-  const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType && contentType !== "text/plain" && contentType !== "application/jwt") {
-    return addonResponse(renderError("Unsupported request", "The ServiceM8 callback content type was not accepted."), 415);
-  }
-
   try {
     const verified = await verifyServiceM8Event(await request.text(), getConfig().serviceM8AppSecret);
     const replayExpiry = verified.event.exp
