@@ -1,7 +1,7 @@
 import { SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loadPhaseZeroJobContext } = vi.hoisted(() => ({
+const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
   consumeEventHash: vi.fn(async () => true),
   clientConstructor: vi.fn(),
   getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
@@ -13,12 +13,18 @@ const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loa
     companyUUID: "123e4567-cb72-4d94-8a1e-d454131257eb",
     companyName: "Example Client",
   })),
+  safeLog: vi.fn(),
 }));
 
 vi.mock("@/lib/config", () => ({
   getConfig: () => ({ serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough" }),
 }));
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
+vi.mock("@/lib/security/safe-log", () => ({
+  correlationId: () => "test-request-id",
+  redactIdentifier: () => "redacted",
+  safeLog,
+}));
 vi.mock("@/lib/servicem8/client", () => ({
   ServiceM8ApiError: class ServiceM8ApiError extends Error {},
   ServiceM8Client: class ServiceM8Client {
@@ -137,6 +143,22 @@ describe("ServiceM8 event route", () => {
     expect(response.status).toBe(428);
     expect(clientConstructor).not.toHaveBeenCalled();
     expect(await response.text()).not.toContain(event.auth.staffUUID);
+  });
+
+  it("logs field names but no field values when a menu schema is rejected", async () => {
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, eventArgs: { menuItemUUID: "private-value" } }),
+    }));
+    expect(response.status).toBe(401);
+    expect(safeLog).toHaveBeenCalledWith("warn", "Rejected invalid ServiceM8 event", expect.objectContaining({
+      requestId: "test-request-id",
+      validationCategory: "schema",
+      validationEventArgsKeys: "menuItemUUID",
+      validationIssueCodes: "unrecognized_keys",
+    }));
+    expect(JSON.stringify(safeLog.mock.calls)).not.toContain("private-value");
+    expect(clientConstructor).not.toHaveBeenCalled();
   });
 
   it("accepts a valid signed callback regardless of its declared media type", async () => {

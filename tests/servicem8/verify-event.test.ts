@@ -58,6 +58,35 @@ describe("verifyServiceM8Event", () => {
     await expect(verifyServiceM8Event(token, secret, now)).rejects.toBeInstanceOf(EventVerificationError);
   });
 
+  it("reports only structural diagnostics for a schema mismatch", async () => {
+    const token = await sign({
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      eventArgs: { menuItemUUID: "do-not-log-this-value" },
+      iat: now - 5,
+      exp: now + 120,
+    });
+    const error = await verifyServiceM8Event(token, secret, now).catch((caught) => caught);
+    expect(error).toBeInstanceOf(EventVerificationError);
+    expect(error).toMatchObject({
+      category: "schema",
+      diagnostics: {
+        payloadKeys: ["auth", "eventArgs", "eventName", "eventVersion", "exp", "iat"],
+        authKeys: ["accountUUID", "staffUUID"],
+        eventArgsType: "object",
+        eventArgsKeys: ["menuItemUUID"],
+        issueCodes: ["unrecognized_keys"],
+      },
+    });
+    expect(JSON.stringify(error.diagnostics)).not.toContain("do-not-log-this-value");
+  });
+
+  it("does not attach payload diagnostics to a signature failure", async () => {
+    const token = `${await sign({ ...baseEvent, iat: now, exp: now + 60 })}tampered`;
+    const error = await verifyServiceM8Event(token, secret, now).catch((caught) => caught);
+    expect(error).toMatchObject({ category: "signature", diagnostics: undefined });
+  });
+
   it.each([
     ["wrong algorithm", () => sign({ ...baseEvent, iat: now, exp: now + 60 }, "HS512")],
     ["wrong event", () => sign({ ...baseEvent, eventName: "another_event", iat: now, exp: now + 60 })],

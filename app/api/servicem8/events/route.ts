@@ -61,7 +61,17 @@ export async function POST(request: Request) {
     return addonResponse(renderJobContext(verified.event, context));
   } catch (error) {
     if (error instanceof EventVerificationError) {
-      safeLog("warn", "Rejected invalid ServiceM8 event", { requestId });
+      safeLog("warn", "Rejected invalid ServiceM8 event", {
+        requestId,
+        validationCategory: error.category,
+        validationPayloadKeys: error.diagnostics?.payloadKeys.join(","),
+        validationAuthType: error.diagnostics?.authType,
+        validationAuthKeys: error.diagnostics?.authKeys.join(","),
+        validationEventArgsType: error.diagnostics?.eventArgsType,
+        validationEventArgsKeys: error.diagnostics?.eventArgsKeys.join(","),
+        validationIssueCodes: error.diagnostics?.issueCodes.join(","),
+        validationIssuePaths: error.diagnostics?.issuePaths.join(","),
+      });
       return addonResponse(renderError("Launch rejected", "The ServiceM8 signature or event data was invalid."), 401);
     }
     if (error instanceof ServiceM8ApiError) {
