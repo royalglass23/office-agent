@@ -7,6 +7,11 @@ const API_BASE_URL = "https://api.servicem8.com/api_1.0/";
 const EXPIRY_BUFFER_MS = 30_000;
 
 const vendorSchema = z.object({ uuid: uuidSchema }).passthrough();
+const staffSchema = z.object({
+  uuid: uuidSchema,
+  first: z.string().trim().min(1).max(30),
+  last: z.string().trim().max(30).optional(),
+}).passthrough();
 
 export class ServiceM8ApiError extends Error {
   constructor(
@@ -133,6 +138,14 @@ export class ServiceM8Client {
   getCompany(companyUUID: string) {
     uuidSchema.parse(companyUUID);
     return this.get(`company/${companyUUID}.json`);
+  }
+
+  async getStaff(staffUUID: string) {
+    uuidSchema.parse(staffUUID);
+    const staff = staffSchema.safeParse(await this.get(`staff/${staffUUID}.json`));
+    if (!staff.success) throw new ServiceM8ApiError("ServiceM8 returned an invalid Staff record", 502);
+    if (staff.data.uuid !== staffUUID) throw new ServiceM8ApiError("ServiceM8 Staff identity mismatch", 403);
+    return staff.data;
   }
 }
 

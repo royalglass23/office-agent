@@ -1,9 +1,10 @@
 import { SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { consumeEventHash, clientConstructor, requireVendorAccount, loadPhaseZeroJobContext } = vi.hoisted(() => ({
+const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loadPhaseZeroJobContext } = vi.hoisted(() => ({
   consumeEventHash: vi.fn(async () => true),
   clientConstructor: vi.fn(),
+  getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
   requireVendorAccount: vi.fn(async () => undefined),
   loadPhaseZeroJobContext: vi.fn(async () => ({
     jobUUID: "0686ce69-4a5d-4f73-ad56-827ffaaced2b",
@@ -20,7 +21,10 @@ vi.mock("@/lib/config", () => ({
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
 vi.mock("@/lib/servicem8/client", () => ({
   ServiceM8ApiError: class ServiceM8ApiError extends Error {},
-  ServiceM8Client: class ServiceM8Client { constructor(...args: unknown[]) { clientConstructor(...args); } },
+  ServiceM8Client: class ServiceM8Client {
+    constructor(...args: unknown[]) { clientConstructor(...args); }
+    getStaff(staffUUID: string) { return getStaff(staffUUID); }
+  },
   requireVendorAccount,
 }));
 vi.mock("@/lib/servicem8/job-context", () => ({ loadPhaseZeroJobContext }));
@@ -35,6 +39,12 @@ const event = {
     staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
   },
   eventArgs: { jobUUID: "0686ce69-4a5d-4f73-ad56-827ffaaced2b" },
+};
+
+const menuEvent = {
+  ...event,
+  eventName: "rg_office_assistant_menu",
+  eventArgs: {},
 };
 
 async function sign(payload: Record<string, unknown> = event) {
@@ -98,6 +108,35 @@ describe("ServiceM8 event route", () => {
     expect(await response.json()).toMatchObject({
       eventResponse: expect.stringContaining("Q123"),
     });
+  });
+
+  it("renders the signed staff member's name for a fresh global menu launch", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      headers: { "content-type": "application/jwt" },
+      body: await sign({ ...menuEvent, iat: now - 1, exp: now + 120 }),
+    }));
+    expect(response.status).toBe(200);
+    expect(clientConstructor).toHaveBeenCalledWith(event.auth.accountUUID, event.auth.staffUUID);
+    expect(requireVendorAccount).toHaveBeenCalledOnce();
+    expect(getStaff).toHaveBeenCalledWith(event.auth.staffUUID);
+    expect(loadPhaseZeroJobContext).not.toHaveBeenCalled();
+    const { eventResponse } = await response.json();
+    expect(eventResponse).toContain("Hi, May—anything I can help with?");
+    expect(eventResponse).toContain("Leave: use ServiceM8 navigation");
+    expect(eventResponse).toContain("No message leaves this page");
+    expect(eventResponse).not.toContain("closeWindow");
+  });
+
+  it("keeps a menu launch fail-closed when freshness cannot be proven", async () => {
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign(menuEvent),
+    }));
+    expect(response.status).toBe(428);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(await response.text()).not.toContain(event.auth.staffUUID);
   });
 
   it("accepts a valid signed callback regardless of its declared media type", async () => {

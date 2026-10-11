@@ -14,6 +14,32 @@ const validConnection = {
 };
 
 describe("ServiceM8Client", () => {
+  it("retrieves the signed staff member and validates its identity", async () => {
+    const fetcher = vi.fn(async () => Response.json({ uuid: staffUUID, first: " May ", last: "Yang" })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+    await expect(client.getStaff(staffUUID)).resolves.toMatchObject({ uuid: staffUUID, first: "May" });
+    expect(String((fetcher as ReturnType<typeof vi.fn>).mock.calls[0][0])).toBe(
+      `https://api.servicem8.com/api_1.0/staff/${staffUUID}.json`,
+    );
+  });
+
+  it("rejects a Staff response for a different identity", async () => {
+    const fetcher = vi.fn(async () => Response.json({
+      uuid: "123e4567-cb72-4d94-8a1e-d454131257eb",
+      first: "Wrong",
+    })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+    await expect(client.getStaff(staffUUID)).rejects.toMatchObject({ status: 403 });
+  });
+
   it("sends the verified staff impersonation header on every read", async () => {
     const fetcher = vi.fn(async () => Response.json({ uuid: jobUUID })) as unknown as typeof fetch;
     const client = new ServiceM8Client(accountUUID, staffUUID, {

@@ -34,6 +34,30 @@ describe("verifyServiceM8Event", () => {
     expect(result.freshness).toBe("unavailable");
   });
 
+  it("accepts a menu launch without inventing Job context", async () => {
+    const token = await sign({
+      ...baseEvent,
+      eventName: "RG_OFFICE_ASSISTANT_MENU",
+      eventArgs: {},
+      iat: now - 5,
+      exp: now + 120,
+    });
+    const result = await verifyServiceM8Event(token, secret, now);
+    expect(result.event.eventName).toBe("rg_office_assistant_menu");
+    expect(result.event.eventArgs).toEqual({});
+    expect("jobUUID" in result.event.eventArgs).toBe(false);
+  });
+
+  it("rejects a menu launch that claims Job context", async () => {
+    const token = await sign({
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      iat: now - 5,
+      exp: now + 120,
+    });
+    await expect(verifyServiceM8Event(token, secret, now)).rejects.toBeInstanceOf(EventVerificationError);
+  });
+
   it.each([
     ["wrong algorithm", () => sign({ ...baseEvent, iat: now, exp: now + 60 }, "HS512")],
     ["wrong event", () => sign({ ...baseEvent, eventName: "another_event", iat: now, exp: now + 60 })],
