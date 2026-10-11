@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { renderJobContext } from "@/lib/servicem8/render-context-html";
+import { renderJobContext, renderMenuAssistant } from "@/lib/servicem8/render-context-html";
+
+describe("renderMenuAssistant", () => {
+  it("renders and escapes the resolved staff first name", () => {
+    const html = renderMenuAssistant(`<script>alert("name")</script>`);
+    expect(html).toContain('Hi, &lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;—anything I can help with?');
+    expect(html).not.toContain('<script>alert("name")</script>');
+  });
+});
 
 describe("renderJobContext", () => {
   it("escapes untrusted ServiceM8 fields", () => {

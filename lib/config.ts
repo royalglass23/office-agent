@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes"] as const;
+const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes", "read_staff"] as const;
 
 const envSchema = z.object({
   APP_BASE_URL: z.url().refine((url) => url.startsWith("https://"), "must use HTTPS"),

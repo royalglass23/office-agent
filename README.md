@@ -1,7 +1,9 @@
 # RG Office Assistant
 
-Phase 0 read-only feasibility spike for launching a staff-permission-aware Job action inside
-ServiceM8. It does not contain an AI assistant or any ServiceM8 write path.
+Phase 0 read-only feasibility spike for ServiceM8. It contains the existing staff-permission-aware
+Job action plus a local-only chatbot interface proof launched from the global web Add-ons menu. The
+menu launch resolves the signed staff member's first name through the read-only Staff API. It does
+not contain AI, a ServiceM8 write path, Job Diary access, or cross-page chat persistence.
 
 ## Local checks
 

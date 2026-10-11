@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { decodeProtectedHeader, errors, jwtVerify } from "jose";
-import { serviceM8JobEventSchema, type ServiceM8JobEvent } from "./event-schema";
+import { serviceM8EventSchema, type ServiceM8Event } from "./event-schema";
 
 const MAX_EVENT_AGE_SECONDS = 5 * 60;
 const CLOCK_SKEW_SECONDS = 30;
@@ -13,7 +13,7 @@ export class EventVerificationError extends Error {
 }
 
 export type VerifiedServiceM8Event = {
-  event: ServiceM8JobEvent;
+  event: ServiceM8Event;
   eventHash: string;
   freshness: "verified" | "unavailable";
 };
@@ -39,7 +39,7 @@ export async function verifyServiceM8Event(
       clockTolerance: CLOCK_SKEW_SECONDS,
       currentDate: new Date(nowSeconds * 1000),
     });
-    const event = serviceM8JobEventSchema.parse(verified.payload);
+    const event = serviceM8EventSchema.parse(verified.payload);
     let freshness: VerifiedServiceM8Event["freshness"] = "unavailable";
 
     if (event.iat !== undefined && event.exp !== undefined) {

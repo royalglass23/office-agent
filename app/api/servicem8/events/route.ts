@@ -2,7 +2,7 @@ import { getConfig } from "@/lib/config";
 import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import { loadPhaseZeroJobContext } from "@/lib/servicem8/job-context";
-import { renderError, renderJobContext, renderLaunchProof } from "@/lib/servicem8/render-context-html";
+import { renderError, renderJobContext, renderLaunchProof, renderMenuAssistant } from "@/lib/servicem8/render-context-html";
 import { EventVerificationError, verifyServiceM8Event } from "@/lib/servicem8/verify-event";
 import { consumeEventHash } from "@/lib/storage/consumed-events";
 
@@ -36,12 +36,22 @@ export async function POST(request: Request) {
       requestId,
       account: redactIdentifier(verified.event.auth.accountUUID),
       staff: redactIdentifier(verified.event.auth.staffUUID),
-      job: redactIdentifier(verified.event.eventArgs.jobUUID),
+      ...(verified.event.eventName === "rg_office_assistant"
+        ? { job: redactIdentifier(verified.event.eventArgs.jobUUID) }
+        : { launch: "global-menu" }),
     };
 
     if (verified.freshness === "unavailable") {
       safeLog("warn", "Signed event has no usable freshness claims; data access stopped", identifiers);
       return addonResponse(renderLaunchProof(verified.event), 428);
+    }
+
+    if (verified.event.eventName === "rg_office_assistant_menu") {
+      const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);
+      await requireVendorAccount(client, verified.event.auth.accountUUID);
+      const staff = await client.getStaff(verified.event.auth.staffUUID);
+      safeLog("info", "Completed named global menu launch", identifiers);
+      return addonResponse(renderMenuAssistant(staff.first));
     }
 
     const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);
@@ -59,7 +69,7 @@ export async function POST(request: Request) {
       const reconnect = error.status === 401
         ? "The ServiceM8 connection is unavailable. An account administrator must reconnect the add-on."
         : "ServiceM8 did not permit this read-only request.";
-      return addonResponse(renderError("Unable to open this Job", reconnect), error.status === 401 ? 401 : 403);
+      return addonResponse(renderError("Unable to open RG Office Assistant", reconnect), error.status === 401 ? 401 : 403);
     }
     safeLog("error", "Phase 0 event failed", { requestId });
     return addonResponse(renderError("Unable to open RG Office Assistant", "The request failed safely. No Job details are shown."), 500);
