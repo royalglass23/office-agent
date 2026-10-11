@@ -53,7 +53,7 @@ async function requestTokens(
     grantedScopes.size !== requiredScopes.size ||
     [...requiredScopes].some((scope) => !grantedScopes.has(scope))
   ) {
-    throw new OAuthExchangeError("ServiceM8 did not grant the exact Phase 0 scope set");
+    throw new OAuthExchangeError("ServiceM8 did not grant the exact required scope set");
   }
   return {
     accessToken: parsed.data.access_token,

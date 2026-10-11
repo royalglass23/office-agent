@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const phaseZeroScopes = ["vendor", "read_jobs", "read_customers"] as const;
+const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes"] as const;
 
 const envSchema = z.object({
   APP_BASE_URL: z.url().refine((url) => url.startsWith("https://"), "must use HTTPS"),
@@ -31,12 +31,12 @@ export function getConfig(): PhaseZeroConfig {
 
   const env = envSchema.parse(process.env);
   const configuredScopes = new Set(env.SERVICEM8_OAUTH_SCOPES.split(/\s+/).filter(Boolean));
-  const exactScopes = new Set(phaseZeroScopes);
+  const exactScopes = new Set(requiredScopes);
   if (
     configuredScopes.size !== exactScopes.size ||
-    [...configuredScopes].some((scope) => !exactScopes.has(scope as (typeof phaseZeroScopes)[number]))
+    [...configuredScopes].some((scope) => !exactScopes.has(scope as (typeof requiredScopes)[number]))
   ) {
-    throw new Error(`SERVICEM8_OAUTH_SCOPES must be exactly: ${phaseZeroScopes.join(" ")}`);
+    throw new Error(`SERVICEM8_OAUTH_SCOPES must be exactly: ${requiredScopes.join(" ")}`);
   }
 
   const appBaseUrl = new URL(env.APP_BASE_URL);
@@ -57,7 +57,7 @@ export function getConfig(): PhaseZeroConfig {
     serviceM8AppId: env.SERVICEM8_APP_ID,
     serviceM8AppSecret: env.SERVICEM8_APP_SECRET,
     oauthRedirectUri,
-    oauthScopes: [...phaseZeroScopes].join(" "),
+    oauthScopes: [...requiredScopes].join(" "),
     databaseUrl: databaseUrl.toString(),
     tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY,
     sessionSigningSecret: env.SESSION_SIGNING_SECRET,

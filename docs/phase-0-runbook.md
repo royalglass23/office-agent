@@ -3,6 +3,10 @@
 This runbook closes the live evidence that local tests cannot prove. A deployment is not a Phase 0
 GO until every required row below has redacted evidence and no stop condition is triggered.
 
+This is the original three-scope Phase 0 runbook. The later Job Diary Notes scope change is tracked
+in `docs/job-diary-summary-design.md`; do not use this provisioning section to configure that
+four-scope release.
+
 ## Provisioning
 
 1. Create an isolated Postgres database for this spike and apply `npm run db:migrate`.
