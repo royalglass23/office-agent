@@ -11,7 +11,7 @@ beforeEach(() => {
     SERVICEM8_APP_ID: "app-id",
     SERVICEM8_APP_SECRET: "app-secret-with-enough-length",
     SERVICEM8_OAUTH_REDIRECT_URI: "https://office.example.test/api/servicem8/oauth/callback",
-    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers",
+    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes",
     DATABASE_URL: "postgres://unused",
     TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
     SESSION_SIGNING_SECRET: "session-secret-with-at-least-thirty-two-bytes",
@@ -19,7 +19,7 @@ beforeEach(() => {
   resetConfigForTests();
 });
 
-function tokenResponse(scope = "vendor read_jobs read_customers") {
+function tokenResponse(scope = "vendor read_jobs read_customers read_job_notes") {
   return new Response(JSON.stringify({
     access_token: "access",
     refresh_token: "rotated-refresh",
@@ -33,7 +33,7 @@ describe("ServiceM8 OAuth", () => {
   it("builds the least-privilege authorize request with one-time state", () => {
     const url = buildAuthorizeUrl("state-value");
     expect(url.origin + url.pathname).toBe("https://go.servicem8.com/oauth/authorize");
-    expect(url.searchParams.get("scope")).toBe("vendor read_jobs read_customers");
+    expect(url.searchParams.get("scope")).toBe("vendor read_jobs read_customers read_job_notes");
     expect(url.searchParams.get("state")).toBe("state-value");
   });
 
@@ -46,13 +46,18 @@ describe("ServiceM8 OAuth", () => {
     expect(tokens.expiresAt.toISOString()).toBe("1970-01-01T01:00:00.000Z");
   });
 
-  it("requires all three Phase 0 scopes", async () => {
+  it("requires the read-only Notes scope in addition to the Phase 0 scopes", async () => {
+    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers")) as unknown as typeof fetch;
+    await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
+  });
+
+  it("rejects a grant missing other required scopes", async () => {
     const fetcher = vi.fn(async () => tokenResponse("read_jobs")) as unknown as typeof fetch;
     await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
   });
 
   it("rejects any extra scope, including a write scope", async () => {
-    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers manage_jobs")) as unknown as typeof fetch;
+    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers read_job_notes manage_jobs")) as unknown as typeof fetch;
     await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
   });
 
