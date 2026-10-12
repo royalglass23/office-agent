@@ -69,6 +69,7 @@ export async function POST(request: Request) {
         validationAuthKeys: error.diagnostics?.authKeys.join(","),
         validationEventArgsType: error.diagnostics?.eventArgsType,
         validationEventArgsKeys: error.diagnostics?.eventArgsKeys.join(","),
+        validationEventArgsArrayLength: error.diagnostics?.eventArgsArrayLength,
         validationIssueCodes: error.diagnostics?.issueCodes.join(","),
         validationIssuePaths: error.diagnostics?.issuePaths.join(","),
       });

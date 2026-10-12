@@ -26,6 +26,13 @@ const jobEventArgsSchema = z
   })
   .strict();
 
+const menuEventArgsSchema = z
+  .union([
+    z.object({}).strict(),
+    z.array(z.never()).length(0),
+  ])
+  .transform(() => ({} as Record<string, never>));
+
 export const serviceM8JobEventSchema = z
   .object({
     ...eventClaimsSchema,
@@ -38,8 +45,8 @@ export const serviceM8MenuEventSchema = z
   .object({
     ...eventClaimsSchema,
     eventName: z.string().transform((value) => value.toLowerCase()).pipe(z.literal("rg_office_assistant_menu")),
-    // Menu arguments are undocumented. Fail closed on anything except the empty shape until a live launch proves it.
-    eventArgs: z.object({}).strict(),
+    // Live global-menu launches use an empty array. Normalize only empty shapes and never invent Job context.
+    eventArgs: menuEventArgsSchema,
   })
   .strict();
 

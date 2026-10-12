@@ -38,7 +38,7 @@ describe("verifyServiceM8Event", () => {
     const token = await sign({
       ...baseEvent,
       eventName: "RG_OFFICE_ASSISTANT_MENU",
-      eventArgs: {},
+      eventArgs: [],
       iat: now - 5,
       exp: now + 120,
     });
@@ -52,6 +52,17 @@ describe("verifyServiceM8Event", () => {
     const token = await sign({
       ...baseEvent,
       eventName: "rg_office_assistant_menu",
+      iat: now - 5,
+      exp: now + 120,
+    });
+    await expect(verifyServiceM8Event(token, secret, now)).rejects.toBeInstanceOf(EventVerificationError);
+  });
+
+  it("rejects a menu launch with non-empty array arguments", async () => {
+    const token = await sign({
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      eventArgs: ["unexpected"],
       iat: now - 5,
       exp: now + 120,
     });

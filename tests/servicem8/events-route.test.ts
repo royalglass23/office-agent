@@ -50,7 +50,7 @@ const event = {
 const menuEvent = {
   ...event,
   eventName: "rg_office_assistant_menu",
-  eventArgs: {},
+  eventArgs: [],
 };
 
 async function sign(payload: Record<string, unknown> = event) {
@@ -135,10 +135,11 @@ describe("ServiceM8 event route", () => {
     expect(eventResponse).not.toContain("closeWindow");
   });
 
-  it("keeps a menu launch fail-closed when freshness cannot be proven", async () => {
+  it("keeps a menu launch fail-closed when iat and jti are supplied without exp", async () => {
+    const now = Math.floor(Date.now() / 1000);
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
       method: "POST",
-      body: await sign(menuEvent),
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "live-menu-event-id" }),
     }));
     expect(response.status).toBe(428);
     expect(clientConstructor).not.toHaveBeenCalled();
@@ -156,6 +157,22 @@ describe("ServiceM8 event route", () => {
       validationCategory: "schema",
       validationEventArgsKeys: "menuItemUUID",
       validationIssueCodes: "unrecognized_keys",
+    }));
+    expect(JSON.stringify(safeLog.mock.calls)).not.toContain("private-value");
+    expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("logs only the argument count when a menu array is rejected", async () => {
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, eventArgs: ["private-value"] }),
+    }));
+    expect(response.status).toBe(401);
+    expect(safeLog).toHaveBeenCalledWith("warn", "Rejected invalid ServiceM8 event", expect.objectContaining({
+      requestId: "test-request-id",
+      validationCategory: "schema",
+      validationEventArgsType: "array",
+      validationEventArgsArrayLength: 1,
     }));
     expect(JSON.stringify(safeLog.mock.calls)).not.toContain("private-value");
     expect(clientConstructor).not.toHaveBeenCalled();
