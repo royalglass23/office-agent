@@ -24,6 +24,7 @@ export type EventSchemaDiagnostics = {
   authKeys: string[];
   eventArgsType: string;
   eventArgsKeys: string[];
+  eventArgsArrayLength?: number;
   issueCodes: string[];
   issuePaths: string[];
 };
@@ -56,6 +57,7 @@ function schemaDiagnostics(payload: unknown, issues: z.core.$ZodIssue[]): EventS
     authKeys: keysOf(record.auth),
     eventArgsType: valueType(record.eventArgs),
     eventArgsKeys: keysOf(record.eventArgs),
+    eventArgsArrayLength: Array.isArray(record.eventArgs) ? record.eventArgs.length : undefined,
     issueCodes: [...new Set(issues.map((issue) => issue.code))].sort(),
     issuePaths: [...new Set(issues.map((issue) => (
       issue.path.length === 0 ? "$" : issue.path.map(safeKey).join(".")
