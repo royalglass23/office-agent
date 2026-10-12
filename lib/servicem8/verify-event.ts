@@ -103,7 +103,19 @@ export async function verifyServiceM8Event(
     const event = parsedEvent.data;
     let freshness: VerifiedServiceM8Event["freshness"] = "unavailable";
 
-    if (event.iat !== undefined && event.exp !== undefined) {
+    if (event.eventName === "rg_office_assistant_menu") {
+      if (event.iat !== undefined && event.jti !== undefined) {
+        if (event.iat > nowSeconds + CLOCK_SKEW_SECONDS) throw new EventVerificationError("Event issued in the future");
+        if (nowSeconds - event.iat > MAX_EVENT_AGE_SECONDS) throw new EventVerificationError("Event is too old");
+        if (event.exp !== undefined) {
+          if (event.exp <= nowSeconds - CLOCK_SKEW_SECONDS) throw new EventVerificationError("Event expired");
+          if (event.exp <= event.iat || event.exp - event.iat > MAX_EVENT_AGE_SECONDS) {
+            throw new EventVerificationError("Event freshness window is unsafe");
+          }
+        }
+        freshness = "verified";
+      }
+    } else if (event.iat !== undefined && event.exp !== undefined) {
       if (event.iat > nowSeconds + CLOCK_SKEW_SECONDS) throw new EventVerificationError("Event issued in the future");
       if (event.exp <= nowSeconds - CLOCK_SKEW_SECONDS) throw new EventVerificationError("Event expired");
       if (event.exp <= event.iat || event.exp - event.iat > MAX_EVENT_AGE_SECONDS) {
@@ -112,9 +124,13 @@ export async function verifyServiceM8Event(
       freshness = "verified";
     }
 
+    const replayIdentity = event.eventName === "rg_office_assistant_menu" && event.jti !== undefined
+      ? `servicem8-menu\0${event.auth.accountUUID}\0${event.jti}`
+      : token;
+
     return {
       event,
-      eventHash: createHash("sha256").update(token).digest("hex"),
+      eventHash: createHash("sha256").update(replayIdentity).digest("hex"),
       freshness,
     };
   } catch (error) {

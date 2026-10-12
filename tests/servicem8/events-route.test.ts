@@ -121,7 +121,7 @@ describe("ServiceM8 event route", () => {
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
       method: "POST",
       headers: { "content-type": "application/jwt" },
-      body: await sign({ ...menuEvent, iat: now - 1, exp: now + 120 }),
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "fresh-menu-launch" }),
     }));
     expect(response.status).toBe(200);
     expect(clientConstructor).toHaveBeenCalledWith(event.auth.accountUUID, event.auth.staffUUID);
@@ -135,11 +135,23 @@ describe("ServiceM8 event route", () => {
     expect(eventResponse).not.toContain("closeWindow");
   });
 
-  it("keeps a menu launch fail-closed when iat and jti are supplied without exp", async () => {
+  it("rejects a replayed fresh global menu launch before API access", async () => {
+    consumeEventHash.mockResolvedValueOnce(false);
     const now = Math.floor(Date.now() / 1000);
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
       method: "POST",
-      body: await sign({ ...menuEvent, iat: now - 1, jti: "live-menu-event-id" }),
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "replayed-menu-launch" }),
+    }));
+    expect(response.status).toBe(409);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(getStaff).not.toHaveBeenCalled();
+  });
+
+  it("keeps a menu launch fail-closed when jti is missing even with exp", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, iat: now - 1, exp: now + 120 }),
     }));
     expect(response.status).toBe(428);
     expect(clientConstructor).not.toHaveBeenCalled();

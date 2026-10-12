@@ -40,12 +40,59 @@ describe("verifyServiceM8Event", () => {
       eventName: "RG_OFFICE_ASSISTANT_MENU",
       eventArgs: [],
       iat: now - 5,
-      exp: now + 120,
+      jti: "live-menu-event-id",
     });
     const result = await verifyServiceM8Event(token, secret, now);
     expect(result.event.eventName).toBe("rg_office_assistant_menu");
     expect(result.event.eventArgs).toEqual({});
     expect("jobUUID" in result.event.eventArgs).toBe(false);
+    expect(result.freshness).toBe("verified");
+  });
+
+  it("uses the account-scoped menu jti as the replay identity", async () => {
+    const payload = {
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      eventArgs: [],
+      iat: now - 5,
+      jti: "one-menu-launch",
+    };
+    const first = await verifyServiceM8Event(await sign({ ...payload, iss: "first" }), secret, now);
+    const second = await verifyServiceM8Event(await sign({ ...payload, iss: "second" }), secret, now);
+    expect(first.eventHash).toBe(second.eventHash);
+  });
+
+  it("keeps a menu launch without jti freshness-unavailable", async () => {
+    const result = await verifyServiceM8Event(await sign({
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      eventArgs: [],
+      iat: now - 5,
+    }), secret, now);
+    expect(result.freshness).toBe("unavailable");
+  });
+
+  it("does not apply the approved menu policy to a Job event", async () => {
+    const result = await verifyServiceM8Event(await sign({
+      ...baseEvent,
+      iat: now - 5,
+      jti: "job-event-without-exp",
+    }), secret, now);
+    expect(result.event.eventName).toBe("rg_office_assistant");
+    expect(result.freshness).toBe("unavailable");
+  });
+
+  it.each([
+    ["older than five minutes", now - 301],
+    ["more than thirty seconds in the future", now + 31],
+  ])("rejects a menu launch issued %s", async (_description, iat) => {
+    await expect(verifyServiceM8Event(await sign({
+      ...baseEvent,
+      eventName: "rg_office_assistant_menu",
+      eventArgs: [],
+      iat,
+      jti: "invalid-time-menu-launch",
+    }), secret, now)).rejects.toBeInstanceOf(EventVerificationError);
   });
 
   it("rejects a menu launch that claims Job context", async () => {
