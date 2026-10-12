@@ -7,6 +7,7 @@ const {
   saveOAuthConnection,
   createAdminSession,
   safeLog,
+  ServiceM8ApiError,
 } = vi.hoisted(() => ({
   consumeOAuthState: vi.fn(),
   exchangeAuthorizationCode: vi.fn(),
@@ -14,11 +15,21 @@ const {
   saveOAuthConnection: vi.fn(),
   createAdminSession: vi.fn(),
   safeLog: vi.fn(),
+  ServiceM8ApiError: class ServiceM8ApiError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly retryable = false,
+      readonly diagnosticCode?: "vendor_http_error" | "vendor_invalid_response",
+    ) {
+      super(message);
+    }
+  },
 }));
 
 vi.mock("@/lib/storage/oauth-state", () => ({ consumeOAuthState }));
 vi.mock("@/lib/servicem8/oauth", () => ({ exchangeAuthorizationCode }));
-vi.mock("@/lib/servicem8/client", () => ({ fetchVendorAccountUUID }));
+vi.mock("@/lib/servicem8/client", () => ({ fetchVendorAccountUUID, ServiceM8ApiError }));
 vi.mock("@/lib/storage/oauth-connections", () => ({ saveOAuthConnection }));
 vi.mock("@/lib/security/admin-session", () => ({
   createAdminSession,
@@ -97,5 +108,21 @@ describe("ServiceM8 OAuth callback diagnostics", () => {
     expect(response.headers.get("set-cookie")).toBe("rg_oauth_admin=private-session-token");
     expect(await response.text()).toContain("RG Office Assistant connected");
     expect(safeLog).toHaveBeenCalledWith("info", "Bound ServiceM8 OAuth connection", { account: "redacted" });
+  });
+
+  it("logs only a safe Vendor failure category and HTTP status", async () => {
+    fetchVendorAccountUUID.mockRejectedValueOnce(
+      new ServiceM8ApiError("private response detail", 403, false, "vendor_http_error"),
+    );
+
+    const response = await GET(callbackRequest());
+
+    expect(response.status).toBe(502);
+    expect(safeLog).toHaveBeenCalledWith("error", "ServiceM8 OAuth account binding failed", {
+      stage: "vendor_identity",
+      failure: "vendor_http_error",
+      serviceM8Status: 403,
+    });
+    expect(JSON.stringify(safeLog.mock.calls)).not.toContain("private response detail");
   });
 });

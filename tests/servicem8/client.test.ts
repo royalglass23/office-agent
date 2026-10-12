@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ServiceM8Client } from "@/lib/servicem8/client";
+import { fetchVendorAccountUUID, ServiceM8Client } from "@/lib/servicem8/client";
 import type { OAuthConnection, OAuthTokenSet } from "@/lib/storage/oauth-connections";
 
 const accountUUID = "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b";
@@ -134,5 +134,36 @@ describe("ServiceM8Client", () => {
     await expect(client.getJob(jobUUID)).rejects.toMatchObject({ status: 503, retryable: true });
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ServiceM8 Vendor binding diagnostics", () => {
+  it("classifies a denied Vendor request without retaining its response body", async () => {
+    const fetcher = vi.fn(async () => new Response("private denial body", { status: 403 })) as unknown as typeof fetch;
+
+    await expect(fetchVendorAccountUUID("private-token", fetcher)).rejects.toMatchObject({
+      diagnosticCode: "vendor_http_error",
+      status: 403,
+    });
+  });
+
+  it.each([
+    new Response("not-json", { status: 200, headers: { "content-type": "application/json" } }),
+    Response.json([]),
+    Response.json([{ uuid: "not-a-uuid" }]),
+    Response.json([{ uuid: accountUUID }, { uuid: staffUUID }]),
+  ])("classifies an unusable successful Vendor response", async (response) => {
+    const fetcher = vi.fn(async () => response) as unknown as typeof fetch;
+
+    await expect(fetchVendorAccountUUID("private-token", fetcher)).rejects.toMatchObject({
+      diagnosticCode: "vendor_invalid_response",
+      status: 200,
+    });
+  });
+
+  it("returns the single valid Vendor UUID", async () => {
+    const fetcher = vi.fn(async () => Response.json([{ uuid: accountUUID }])) as unknown as typeof fetch;
+
+    await expect(fetchVendorAccountUUID("private-token", fetcher)).resolves.toBe(accountUUID);
   });
 });

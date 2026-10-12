@@ -1,6 +1,6 @@
 import { adminSessionCookie, createAdminSession } from "@/lib/security/admin-session";
 import { redactIdentifier, safeLog } from "@/lib/security/safe-log";
-import { fetchVendorAccountUUID } from "@/lib/servicem8/client";
+import { fetchVendorAccountUUID, ServiceM8ApiError } from "@/lib/servicem8/client";
 import { exchangeAuthorizationCode } from "@/lib/servicem8/oauth";
 import { renderError } from "@/lib/servicem8/render-context-html";
 import { saveOAuthConnection } from "@/lib/storage/oauth-connections";
@@ -43,8 +43,17 @@ export async function GET(request: Request) {
     safeLog("info", "Bound ServiceM8 OAuth connection", { account: redactIdentifier(accountUUID) });
     const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Connected</title></head><body><main><h1>RG Office Assistant connected</h1><p>The read-only Phase 0 scopes are active for this ServiceM8 account.</p><form action="/api/servicem8/oauth/disconnect" method="post"><button type="submit">Disconnect</button></form></main></body></html>`;
     return new Response(body, { headers: { ...headers, "Set-Cookie": adminSessionCookie(session) } });
-  } catch {
-    safeLog("error", "ServiceM8 OAuth account binding failed", { stage });
+  } catch (error) {
+    const diagnostics: {
+      stage: OAuthBindingStage;
+      failure?: "vendor_http_error" | "vendor_invalid_response";
+      serviceM8Status?: number;
+    } = { stage };
+    if (stage === "vendor_identity" && error instanceof ServiceM8ApiError && error.diagnosticCode) {
+      diagnostics.failure = error.diagnosticCode;
+      diagnostics.serviceM8Status = error.status;
+    }
+    safeLog("error", "ServiceM8 OAuth account binding failed", diagnostics);
     return new Response(renderError("Connection failed", "The ServiceM8 account could not be safely connected."), { status: 502, headers });
   }
 }
