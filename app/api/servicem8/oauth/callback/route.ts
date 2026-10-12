@@ -9,6 +9,8 @@ import { consumeOAuthState } from "@/lib/storage/oauth-state";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type OAuthBindingStage = "token_exchange" | "vendor_identity" | "connection_save" | "admin_session";
+
 const headers = {
   "Cache-Control": "no-store",
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
@@ -29,16 +31,20 @@ export async function GET(request: Request) {
     return new Response(renderError("Connection rejected", "The OAuth state was invalid, expired, or already used."), { status: 400, headers });
   }
 
+  let stage: OAuthBindingStage = "token_exchange";
   try {
     const tokens = await exchangeAuthorizationCode(code);
+    stage = "vendor_identity";
     const accountUUID = await fetchVendorAccountUUID(tokens.accessToken);
+    stage = "connection_save";
     await saveOAuthConnection(accountUUID, tokens);
+    stage = "admin_session";
     const session = await createAdminSession(accountUUID);
     safeLog("info", "Bound ServiceM8 OAuth connection", { account: redactIdentifier(accountUUID) });
     const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Connected</title></head><body><main><h1>RG Office Assistant connected</h1><p>The read-only Phase 0 scopes are active for this ServiceM8 account.</p><form action="/api/servicem8/oauth/disconnect" method="post"><button type="submit">Disconnect</button></form></main></body></html>`;
     return new Response(body, { headers: { ...headers, "Set-Cookie": adminSessionCookie(session) } });
   } catch {
-    safeLog("error", "ServiceM8 OAuth account binding failed");
+    safeLog("error", "ServiceM8 OAuth account binding failed", { stage });
     return new Response(renderError("Connection failed", "The ServiceM8 account could not be safely connected."), { status: 502, headers });
   }
 }
