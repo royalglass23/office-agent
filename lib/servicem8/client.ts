@@ -18,6 +18,7 @@ export class ServiceM8ApiError extends Error {
     message: string,
     readonly status: number,
     readonly retryable = false,
+    readonly diagnosticCode?: "vendor_http_error" | "vendor_invalid_response",
   ) {
     super(message);
     this.name = "ServiceM8ApiError";
@@ -156,10 +157,28 @@ export async function fetchVendorAccountUUID(accessToken: string, fetcher: typeo
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new ServiceM8ApiError("Unable to bind the ServiceM8 account", response.status);
-  const vendors = z.array(vendorSchema).safeParse(await response.json());
+  if (!response.ok) {
+    throw new ServiceM8ApiError("Unable to bind the ServiceM8 account", response.status, false, "vendor_http_error");
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ServiceM8ApiError(
+      "ServiceM8 returned an invalid Vendor identity",
+      response.status,
+      false,
+      "vendor_invalid_response",
+    );
+  }
+  const vendors = z.array(vendorSchema).safeParse(payload);
   if (!vendors.success || vendors.data.length !== 1) {
-    throw new ServiceM8ApiError("ServiceM8 returned an invalid Vendor identity", 502);
+    throw new ServiceM8ApiError(
+      "ServiceM8 returned an invalid Vendor identity",
+      response.status,
+      false,
+      "vendor_invalid_response",
+    );
   }
   return vendors.data[0].uuid;
 }
