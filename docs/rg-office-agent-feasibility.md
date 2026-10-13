@@ -1,6 +1,7 @@
 # RG Office Agent — ServiceM8 Feasibility and Prototype Plan
 
 Assessment date: 9 October 2026
+Last updated: 12 October 2026
 Repository: `royalglass23/rg-office-agent` / `D:\Royal Glass Dev\office-agent`
 Scope: assessment and implementation plan only; no ServiceM8 or production changes
 
@@ -8,9 +9,10 @@ Scope: assessment and implementation plan only; no ServiceM8 or production chang
 
 **GO FOR SPIKE**
 
-This is approval to build and run **Phase 0 only**: the ServiceM8 integration and
-staff-permission proof. It is not approval to build the AI assistant, perform writes, or expose the
-prototype to general staff.
+This is a feasibility recommendation to undertake **Phase 0 only**: the ServiceM8 integration and
+staff-permission proof. It is **not implementation authorization**. Starting Phase 0 requires a
+separate explicit instruction from the user. It is not approval to build the AI assistant, perform
+writes, or expose the prototype to general staff.
 
 The proposed architecture is supported by ServiceM8's current documentation:
 
@@ -20,9 +22,10 @@ The proposed architecture is supported by ServiceM8's current documentation:
 - OAuth supports staff impersonation through `x-impersonate-uuid`;
 - ServiceM8 states that impersonation applies the selected staff member's security.
 
-The decisive uncertainty is whether Royal Glass's actual permission configuration prevents a
-restricted employee from retrieving a known Job UUID directly and from retrieving child records
-belonging to that Job. That must be proven with two real test employees before Phase 1 begins.
+Royal Glass confirmed that its ServiceM8 staff have account-wide Job access, so a hypothetical
+Michael-versus-Carla per-Job restriction is not the applicable boundary. The live boundary is that
+each Global Launch and every subsequent read remain bound to the signed staff and connected
+account, while invalid, expired, replayed, and cross-account launches fail closed.
 
 ## Status legend
 
@@ -371,6 +374,7 @@ SERVICEM8_APP_ID
 SERVICEM8_APP_SECRET
 SERVICEM8_OAUTH_REDIRECT_URI
 SERVICEM8_OAUTH_SCOPES
+SERVICEM8_ALLOWED_ACCOUNT_UUID
 DATABASE_URL
 TOKEN_ENCRYPTION_KEY
 SESSION_SIGNING_SECRET
@@ -464,16 +468,78 @@ Stop Phase 0 and report **NO-GO** if any of the following occurs:
 - OAuth refresh/revocation cannot fail closed;
 - a write scope or ServiceM8 mutation becomes necessary for the read-only proof.
 
-## Phase transition rule
+## H. Phase and stage lock
 
-Phase 1 may start only after the Phase 0 evidence records:
+**Default rule: the next task, stage, or phase is LOCKED.**
 
-- a successful Staff A invocation;
-- a denied Staff B list/search result for Job X;
-- a denied Staff B direct UUID retrieval for Job X;
-- denied restricted child-resource reads for every source Phase 1 will use;
-- correct OAuth account binding and refresh behaviour;
-- safe operation in the actual ServiceM8 modal.
+Completing work inside the current stage does not automatically authorise the next task or stage.
+A plan, successful test, feasibility verdict, code completion, review result, deployment readiness,
+or available credential does not open a gate by itself.
 
-Until then, AI, email drafting, broader Job context, persistent conversations, autonomous actions,
-and every ServiceM8 write remain out of scope.
+The workflow may cross a boundary only when both conditions are satisfied:
+
+1. every required item for the current gate has recorded evidence and the gate is marked `PASS`;
+2. after seeing that gate result, the user explicitly instructs Codex to start the named next stage.
+
+If either condition is missing, Codex must stop at the boundary, report the current state, and wait.
+It must not prepare later-stage code, dependencies, infrastructure, scopes, prompts, migrations, or
+ServiceM8 configuration "while it is there."
+
+### Locked boundaries
+
+| Boundary | Evidence required before `PASS` | Additional authority required |
+| --- | --- | --- |
+| Assessment -> Phase 0A | This assessment remains accepted; required ServiceM8/Vercel test prerequisites are identified; proposed implementation scope is restated. | Explicit user instruction to implement Phase 0A. |
+| Phase 0A -> Phase 0B | Valid and invalid signatures tested; real callback claim set recorded; replay/freshness decision recorded; signed account/staff/Job UUIDs displayed safely in the real modal; no unresolved critical finding. | Explicit user instruction to start Phase 0B after the Phase 0A gate report. |
+| Phase 0B -> bounded Phase 1 | The committed Phase 0 gate records independent Michael and Carla Global Launches, correct staff/session separation, accepted exact-Job-number proofs, no writes or outbound action, and `PASS`. Historical strict-E2E findings remain binding for Job Actions, multi-account/restricted-role claims, new sources, persistence, writes, sending, or autonomy. | Explicit user instruction to start the bounded Phase 1 global Add-ons-menu conversation after the Phase 0 gate report. |
+| Phase 1 -> any write capability | A separate approved specification, minimum write scopes, approval UX, audit design, negative tests, and security gate all pass. | Separate explicit user instruction for the particular write capability. No current approval exists. |
+| Any local stage -> commit, push, deploy, or production configuration | The exact reviewed scope and validation evidence are presented. | Separate explicit authority for each requested operation; one does not imply another. |
+
+### Gate record
+
+At the end of each stage, add a dated record using this exact structure:
+
+```text
+Gate ID:
+Current stage:
+Candidate next stage:
+Required evidence:
+Evidence obtained:
+Unresolved findings:
+Gate result: PASS | FAIL | BLOCKED
+User authorised transition: YES | NO
+Authorisation reference:
+```
+
+`Gate result: PASS` with `User authorised transition: NO` means stop. User approval without a
+`PASS` means stop. `FAIL` or `BLOCKED` means stop and address only the stated blocker; it never means
+reduce the acceptance criteria or continue into later work.
+
+### Anti-drift execution rules
+
+- Work only on the currently authorised stage and its named acceptance evidence.
+- Do not begin the next numbered task merely because the current task is complete.
+- Do not add Phase 1 AI, prompts, email drafting, extended Job context, or OpenAI dependencies during
+  Phase 0.
+- Do not request or configure write scopes during any read-only stage.
+- Do not create persistence beyond the minimum OAuth, state, refresh, and replay security state
+  authorised for Phase 0B.
+- Do not substitute mock, top-level-browser, or administrator-token evidence for the required live
+  staff-permission and embedded-modal evidence.
+- When a new idea appears, record it as deferred scope; do not implement it in the active stage.
+- At every resumed session, read the latest gate record before editing or testing. If no gate record
+  authorises the requested stage, stop and ask for direction.
+
+## Phase 0 to Phase 1 gate
+
+The applicable Phase 0 evidence is recorded in `docs/phase-0-runbook.md`: independent Michael and
+Carla Global Launches, correct staff/session separation, accepted “What happened?” and review-only
+Email Draft results for exact Job numbers, and no ServiceM8 write or outbound action. Royal Glass
+uses account-wide Job access, so restricted Staff A/B denial scenarios are not asserted as evidence
+for this account. Invalid, expired, replayed, and cross-account launches must still fail closed.
+
+On 13 October 2026 the gate was recorded as `PASS`, and the owner then explicitly authorised the
+bounded Phase 1 global Add-ons-menu conversational assistant. This authorisation covers only core
+Job/customer fields and Job diary notes, with no persistent conversation, new source, write,
+sending, or autonomous action. Job Actions remain data-disabled, and address search remains
+deferred. The historical strict-E2E audit remains blocking for any scope beyond this boundary.

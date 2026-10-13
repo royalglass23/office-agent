@@ -8,6 +8,7 @@ const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistant
     appBaseUrl: new URL("https://office.example.test"),
     serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
     sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+    allowedAccountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
   })),
   getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
@@ -77,6 +78,7 @@ describe("ServiceM8 event route", () => {
       appBaseUrl: new URL("https://office.example.test"),
       serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
       sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      allowedAccountUUID: event.auth.accountUUID,
       assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
     });
   });
@@ -90,6 +92,27 @@ describe("ServiceM8 event route", () => {
     expect(response.status).toBe(401);
     expect(consumeEventHash).not.toHaveBeenCalled();
     expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("rejects a signed foreign account before replay storage, API access, or session issuance", async () => {
+    getConfig.mockReturnValueOnce({
+      appBaseUrl: new URL("https://office.example.test"),
+      serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
+      sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      allowedAccountUUID: "123e4567-cb72-4d94-8a1e-d454131257eb",
+      assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
+    });
+    const now = Math.floor(Date.now() / 1000);
+
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "foreign-menu-launch" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect(consumeEventHash).not.toHaveBeenCalled();
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(issueAssistantSession).not.toHaveBeenCalled();
   });
 
   it("stops before OAuth/API access when signed claims cannot prove freshness", async () => {
@@ -154,6 +177,7 @@ describe("ServiceM8 event route", () => {
       appBaseUrl: new URL("https://office.example.test"),
       serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
       sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      allowedAccountUUID: event.auth.accountUUID,
       assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
     });
     const now = Math.floor(Date.now() / 1000);
@@ -169,6 +193,9 @@ describe("ServiceM8 event route", () => {
     const { eventResponse } = await response.json();
     expect(eventResponse).toContain('action="https://office.example.test/assistant"');
     expect(eventResponse).toContain('name="session" value="signed-assistant-session"');
+    expect(eventResponse).toContain("Hi, May—what can I help with?");
+    expect(eventResponse).toContain('name="message"');
+    expect(eventResponse).toContain("What happened to R260766?");
     expect(eventResponse).not.toContain(event.auth.accountUUID);
     expect(eventResponse).not.toContain(event.auth.staffUUID);
   });

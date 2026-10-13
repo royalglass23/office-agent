@@ -1,4 +1,5 @@
 import { getConfig } from "@/lib/config";
+import { parseConversationMessage } from "@/lib/assistant/conversation";
 import { createOpenAIEmailDrafter, OpenAIEmailDraftError } from "@/lib/openai/email-drafter";
 import { createOpenAIProofSummarizer, OpenAIProofError } from "@/lib/openai/proof-summarizer";
 import {
@@ -18,6 +19,9 @@ import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
 import {
   renderEmailDraft,
   renderJobMatches,
+  renderConversationDraftPrompt,
+  renderConversationGuidance,
+  renderConversationProofAnswer,
   renderProofAnswer,
   renderProofMessage,
 } from "@/lib/servicem8/render-context-html";
@@ -34,10 +38,9 @@ const responseHeaders = {
 };
 
 class AssistantInputError extends Error {}
-class AssistantRateLimitError extends Error {}
 
-function html(body: string, status = 200) {
-  return new Response(body, { status, headers: responseHeaders });
+function html(body: string, status = 200, extraHeaders: Record<string, string> = {}) {
+  return new Response(body, { status, headers: { ...responseHeaders, ...extraHeaders } });
 }
 
 async function readForm(request: Request) {
@@ -57,6 +60,16 @@ async function readForm(request: Request) {
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
   const purposeValues = form.getAll("emailPurpose");
+  const messageValues = form.getAll("message").filter((value) => value.trim().length > 0);
+  if (messageValues.length > 1 || (messageValues.length === 1 && messageValues[0].length > 500)) {
+    throw new AssistantInputError("Invalid message");
+  }
+  if (messageValues.length === 1) {
+    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0) {
+      throw new AssistantInputError("Choose a message or one proof action");
+    }
+    return { session, message: messageValues[0].trim() };
+  }
   if (queryValues.length + jobValues.length !== 1) throw new AssistantInputError("Choose a search or one Job");
   if (queryValues.length === 1 && queryValues[0].length > 200) throw new AssistantInputError("Search is too long");
   if (jobValues.length === 1 && !/^[A-Z]\d{6}$/.test(jobValues[0])) throw new AssistantInputError("Invalid Job number");
@@ -69,6 +82,7 @@ async function readForm(request: Request) {
     query: queryValues[0]?.trim(),
     jobNumber: jobValues[0],
     emailPurpose: purposeValues[0]?.trim(),
+    message: undefined,
   };
 }
 
@@ -82,6 +96,25 @@ export async function POST(request: Request) {
 
     const form = await readForm(request);
     const identity = await verifyAssistantSession(form.session, config.sessionSigningSecret);
+    const actionUrl = new URL("/assistant", config.appBaseUrl);
+    const consumeRateSlot = async (action: "request" | "search" | "summary" | "draft") => {
+      const limit = assistantRateLimit(identity, action);
+      for (const hash of limit.hashes) {
+        if (await consumeEventHash(hash, limit.expiresAt)) return null;
+      }
+      return limit;
+    };
+    const requestLimit = await consumeRateSlot("request");
+    if (requestLimit) {
+      return html(
+        renderProofMessage(
+          "Please wait",
+          `The bounded assistant is busy. Wait ${requestLimit.retryAfterSeconds} seconds, then reopen it from ServiceM8.`,
+        ),
+        429,
+        { "Retry-After": String(requestLimit.retryAfterSeconds) },
+      );
+    }
     if (!(await consumeEventHash(
       assistantSessionHash(form.session),
       new Date(Date.now() + 31 * 60 * 1000),
@@ -89,11 +122,57 @@ export async function POST(request: Request) {
       return html(renderProofMessage("Session already used", "Reopen the Office Assistant from ServiceM8."), 409);
     }
 
+    const conversationIntent = form.message ? parseConversationMessage(form.message) : null;
+    if (conversationIntent?.kind === "guidance" || conversationIntent?.kind === "draft") {
+      const nextSession = await issueAssistantSession(
+        identity,
+        config.sessionSigningSecret,
+        new Date(),
+        identity.launchExpiresAt,
+      );
+      if (conversationIntent.kind === "draft") {
+        return html(renderConversationDraftPrompt(
+          form.message!,
+          conversationIntent.jobNumber,
+          actionUrl,
+          nextSession,
+        ));
+      }
+      return html(renderConversationGuidance(
+        form.message!,
+        conversationIntent.message,
+        actionUrl,
+        nextSession,
+      ));
+    }
+    const requestedJobNumber = conversationIntent?.kind === "history"
+      ? conversationIntent.jobNumber
+      : form.jobNumber;
+
     const takeRateLimit = async (action: "search" | "summary" | "draft") => {
-      const limit = assistantRateLimit(identity, action);
-      if (!(await consumeEventHash(limit.hash, limit.expiresAt))) throw new AssistantRateLimitError();
+      const limit = await consumeRateSlot(action);
+      if (!limit) return null;
+      const retrySession = await issueAssistantSession(
+        identity,
+        config.sessionSigningSecret,
+        new Date(),
+        identity.launchExpiresAt,
+      );
+      return html(
+        renderProofMessage(
+          "Please wait",
+          `The bounded proof is busy. Wait ${limit.retryAfterSeconds} seconds and try again.`,
+          actionUrl,
+          retrySession,
+        ),
+        429,
+        { "Retry-After": String(limit.retryAfterSeconds) },
+      );
     };
-    await takeRateLimit(form.emailPurpose ? "draft" : form.jobNumber ? "summary" : "search");
+    const initialRateLimit = await takeRateLimit(
+      form.emailPurpose ? "draft" : requestedJobNumber ? "summary" : "search",
+    );
+    if (initialRateLimit) return initialRateLimit;
 
     const logContext = {
       requestId,
@@ -113,7 +192,6 @@ export async function POST(request: Request) {
         model: config.assistantProof.model,
       }),
     });
-    const actionUrl = new URL("/assistant", config.appBaseUrl);
     const nextSession = await issueAssistantSession(
       identity,
       config.sessionSigningSecret,
@@ -127,9 +205,12 @@ export async function POST(request: Request) {
       return html(renderEmailDraft(result, actionUrl, nextSession));
     }
 
-    if (form.jobNumber) {
-      const answer = await proof.answerWhatHappened(form.jobNumber);
+    if (requestedJobNumber) {
+      const answer = await proof.answerWhatHappened(requestedJobNumber);
       safeLog("info", "Completed selected Job history proof", logContext);
+      if (conversationIntent?.kind === "history") {
+        return html(renderConversationProofAnswer(form.message!, answer, actionUrl, nextSession));
+      }
       return html(renderProofAnswer(answer, actionUrl, nextSession));
     }
 
@@ -144,16 +225,14 @@ export async function POST(request: Request) {
     }
     if (matches.length > 1) return html(renderJobMatches(matches, actionUrl, nextSession));
 
-    await takeRateLimit("summary");
+    const summaryRateLimit = await takeRateLimit("summary");
+    if (summaryRateLimit) return summaryRateLimit;
     const answer = await proof.answerWhatHappened(matches[0].jobNumber);
     safeLog("info", "Completed selected Job history proof", logContext);
     return html(renderProofAnswer(answer, actionUrl, nextSession));
   } catch (error) {
     if (error instanceof AssistantInputError) {
       return html(renderProofMessage("Request rejected", "Enter one Job address or Job number."), 400);
-    }
-    if (error instanceof AssistantRateLimitError) {
-      return html(renderProofMessage("Please wait", "The bounded proof is rate limited. Reopen it from ServiceM8 and try again shortly."), 429);
     }
     if (error instanceof ProofSearchTooBroadError) {
       return html(renderProofMessage("More detail needed", "Enter a more specific Job address or Job number."), 400);

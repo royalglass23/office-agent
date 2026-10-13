@@ -55,8 +55,11 @@ describe("staff-bound assistant session", () => {
     const first = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:00:01Z"));
     const sameBucket = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:00:59Z"));
     const nextBucket = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:01:00Z"));
-    expect(first.hash).toBe(sameBucket.hash);
-    expect(first.hash).not.toBe(nextBucket.hash);
+    expect(first.hashes).toEqual(sameBucket.hashes);
+    expect(first.hashes).toHaveLength(5);
+    expect(new Set(first.hashes).size).toBe(5);
+    expect(first.hashes).not.toEqual(nextBucket.hashes);
+    expect(first.retryAfterSeconds).toBe(59);
     expect(first.expiresAt.toISOString()).toBe("2030-01-01T00:02:00.000Z");
   });
 
@@ -64,7 +67,26 @@ describe("staff-bound assistant session", () => {
     const summary = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:00:01Z"));
     const draft = assistantRateLimit(identity, "draft", new Date("2030-01-01T00:00:01Z"));
 
-    expect(draft.hash).not.toBe(summary.hash);
+    expect(draft.hashes).toHaveLength(5);
+    expect(draft.hashes).not.toEqual(summary.hashes);
     expect(draft.expiresAt.toISOString()).toBe("2030-01-01T00:02:00.000Z");
+  });
+
+  it("allows ten searches per minute without sharing summary slots", () => {
+    const search = assistantRateLimit(identity, "search", new Date("2030-01-01T00:00:30Z"));
+    const summary = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:00:30Z"));
+
+    expect(search.hashes).toHaveLength(10);
+    expect(new Set(search.hashes).size).toBe(10);
+    expect(search.hashes).not.toEqual(summary.hashes);
+    expect(search.retryAfterSeconds).toBe(30);
+  });
+
+  it("caps all assistant requests before intent-specific work", () => {
+    const request = assistantRateLimit(identity, "request", new Date("2030-01-01T00:00:30Z"));
+
+    expect(request.hashes).toHaveLength(20);
+    expect(new Set(request.hashes).size).toBe(20);
+    expect(request.retryAfterSeconds).toBe(30);
   });
 });
