@@ -1,7 +1,7 @@
 # ServiceM8 Job Diary summary module design
 
 Date: 12 October 2026
-Status: synthetic module implemented; read-only R260202 connector probe completed; no AI provider call authorised
+Status: bounded proof implemented locally; read-only R260202 connector probe completed; no live OpenAI proof executed
 
 ## Account-wide access decision (12 October 2026)
 
@@ -100,9 +100,26 @@ The `DiarySummarizer` receives validated, bounded, normalised text rather than r
 Structured access tokens, callback identity, account fields, contact fields, and attachment binaries
 are not forwarded. Recognisable email addresses, phone numbers, UUIDs, and JWT-shaped strings in
 free-form text are redacted. This pattern-based filtering cannot guarantee removal of every secret
-or personal detail; no live AI adapter may be connected before a separate privacy decision.
+or personal detail. The owner has made a bounded privacy decision allowing OpenAI API use only for
+the five allowlisted proof Jobs and the read-only “What happened?” workflow.
 
 ## What “Job Diary” means through the documented API
+
+### Approved initial evidence boundary
+
+The first Office Assistant proof uses only core Selected Job and customer fields plus Job diary
+notes. Its only conversational outcome is a read-only account of what happened on the Selected
+Job. Email Drafts and Suggested Next Actions are deferred along with email, SMS, forms,
+attachments, and schedule activity. These capabilities and sources are not considered unimportant:
+missing one of them can materially change what staff should do next.
+
+For this proof, the answer is presented as a short plain-English summary followed by a dated
+evidence timeline. The format is provisional and may change after staff have verified the proof.
+
+Until an Extended Job History source is separately enabled and verified, every summary, Email
+Draft, and Suggested Next Action must disclose the included and excluded source coverage. The
+assistant must not call the initial evidence a complete Job history or use an excluded source as
+though it had been checked.
 
 The ServiceM8 UI aggregates several record types. The current documented read surfaces are not one
 complete-diary endpoint:

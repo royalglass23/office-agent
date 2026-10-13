@@ -1,11 +1,65 @@
 import { describe, expect, it } from "vitest";
-import { renderJobContext, renderMenuAssistant } from "@/lib/servicem8/render-context-html";
+import {
+  renderJobContext,
+  renderJobMatches,
+  renderMenuAssistant,
+  renderProofAnswer,
+  renderProofAssistant,
+} from "@/lib/servicem8/render-context-html";
 
 describe("renderMenuAssistant", () => {
   it("renders and escapes the resolved staff first name", () => {
     const html = renderMenuAssistant(`<script>alert("name")</script>`);
     expect(html).toContain('Hi, &lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;—anything I can help with?');
     expect(html).not.toContain('<script>alert("name")</script>');
+  });
+
+  it("renders a server-side search form without exposing staff or account identifiers", () => {
+    const html = renderProofAssistant(
+      "May",
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+    expect(html).toContain('action="https://office.example.test/assistant"');
+    expect(html).toContain('name="session" value="signed-session-token"');
+    expect(html).toContain('name="query"');
+    expect(html).not.toContain("accountUUID");
+    expect(html).not.toContain("staffUUID");
+  });
+});
+
+describe("proof result rendering", () => {
+  it("requires explicit selection when several approved Jobs match", () => {
+    const html = renderJobMatches(
+      [
+        { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
+        { jobNumber: "R260680", address: "10 Queen Road", status: "Work Order" },
+      ],
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+    expect(html).toContain("Choose the Job");
+    expect(html).toContain('name="jobNumber" value="R260766"');
+    expect(html).toContain('name="jobNumber" value="R260680"');
+  });
+
+  it("escapes model text and discloses the bounded source coverage", () => {
+    const html = renderProofAnswer({
+      job: { jobNumber: "R260766", address: "10 Queen Street", status: "Work Order", customerName: "Example" },
+      summary: { text: "<script>alert(1)</script>", citations: ["note:1"] },
+      timeline: [{ at: "2026-09-02T10:30:00.000Z", text: "Measured", citations: ["note:1"] }],
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    }, new URL("https://office.example.test/assistant"), "signed-session-token");
+    expect(html).toContain("What happened");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
   });
 });
 

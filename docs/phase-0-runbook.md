@@ -42,9 +42,91 @@ link to restricted evidence storage where needed.
 | Timeout / 429 / 5xx | Bounded safe retry; no stale or cross-user result | NOT RUN |
 | ServiceM8 modal | Renders and remains usable in supported browsers with CSP intact | NOT RUN |
 
-Company is the only child/client endpoint enabled in this Phase 0 build, and its Staff B denial is a
-mandatory Phase 0 gate. Before any other Phase 1 source is enabled, repeat the Staff B known-Job
-test independently for that source.
+## Latest staging attempt
+
+- Date: 13 October 2026
+- Reviewed commit: `8d17c2bd404571a4a0929fdc2fe655ca8cc874c3`
+- Staging reachability: `/health` and `/api/servicem8/manifest` returned `200`.
+- OAuth result: token exchange completed, then account binding failed closed before persistence when
+  ServiceM8 returned HTTP `402` for `GET /api_1.0/vendor.json`.
+- Interpretation: ServiceM8's HTTP response-code documentation defines `402` as the account not
+  being in good standing. Resolve that account state or use an authorised isolated test tenant in
+  good standing; do not bypass Vendor account binding.
+- Evidence hygiene: no OAuth code, state, access token, callback JWT, account identifier, response
+  body, or client data is recorded in this repository.
+- Gate effect: **BLOCKED**. No Staff A/B, cross-account, refresh, replay, or real-modal evidence can
+  count toward the Phase 0 gate from this attempt.
+
+## Production diagnostic - Michael synthetic Job
+
+- Date: 13 October 2026
+- Authorization boundary: user-authorised read-only production diagnostic using an existing
+  synthetic Job; no replay, revocation, load, mutation, or cross-account testing.
+- OAuth account binding: **PASS for the production add-on**. The consented read-only connection was
+  stored and the connected page rendered successfully.
+- Job Action signature: **PASS**. ServiceM8 rendered the real modal and the callback signature and
+  event shape verified.
+- Job Action freshness: **FAIL/BLOCKED**. The real signed Job Action did not contain usable
+  freshness or uniqueness claims. The application stopped before OAuth lookup or any ServiceM8 API
+  data request.
+- Staff session binding: **NOT RUN on the superseded Job Action route**. Michael and Carla are both
+  authorised for account-wide Job access; the relevant proof is that each independently launches
+  the global assistant, is bound to the correct staff identity, and receives no state from the
+  other's conversation.
+- Evidence hygiene: no callback JWT, OAuth value, account/staff/Job UUID, Job content, Company
+  content, or personal information is retained here.
+- Gate effect: **BLOCKED**. Do not weaken the callback gate to obtain Staff A/B evidence.
+
+Company is the only child/client endpoint enabled in this Phase 0 build. There is no Staff B
+known-Job denial requirement because Royal Glass ServiceM8 access is account-wide. Before any
+Phase 1 source is enabled, confirm independent Michael and Carla global sessions, correct staff
+binding on every request, and fail-closed behavior for invalid, expired, replayed, or cross-account
+launches.
+
+The owner will supply the exact production test Job cards for the first proof. Treat that list as
+an allowlist for testing: do not browse, sample, or read any unrelated production Job. Before note
+text is sent to an AI provider, separately confirm that the supplied content is safe for that use
+and that the provider/privacy gate has been satisfied.
+
+Approved production test Job references supplied on 13 October 2026:
+
+- `R260766`
+- `R260680`
+- `R260209`
+- `R260270`
+- `R260208`
+
+This list authorises only the bounded read-only proof. It does not authorise ServiceM8 writes,
+outbound messages, or sending the records to an AI provider without the separate confirmation
+above.
+
+The owner confirmed on 13 October 2026 that the customer fields and diary-note text for all five
+allowlisted Job cards are safe to send to OpenAI's API for this proof. This consent is limited to
+these Job references and this read-only “What happened?” workflow; it does not extend to other
+Jobs, new data sources, providers, write actions, or future features. The specific OpenAI model is
+deployment configuration and must be recorded with the test evidence.
+
+## Bounded “What happened?” implementation candidate
+
+The local candidate now implements the ADR-0001/ADR-0002 proof behind
+`ASSISTANT_PROOF_ENABLED=false` by default. It uses a fresh global-menu launch to mint a signed,
+30-minute staff-bound session; each submitted form token is one-time, and database-backed search
+and summary buckets rate-limit repeated work. It reads only the allowlisted Job numbers, repeats the
+parent Job read before customer/Note access, sends the signed staff UUID on every ServiceM8 read,
+and requests a non-stored strict JSON-schema response from the configured OpenAI model. The model
+returns only up to three authorised evidence IDs; server code constructs all displayed summary and
+timeline text from the corresponding normalised ServiceM8 evidence.
+
+This is local implementation evidence only. Before a production proof:
+
+1. verify and record the configured OpenAI API organisation's retention/data-control settings;
+2. configure the exact `OPENAI_MODEL` and record it with the test evidence;
+3. deploy without enabling the proof, apply the existing security-state migration, and verify
+   health/configuration;
+4. upload the v0.2.0 global-menu-only manifest and reconnect only if ServiceM8 requires it;
+5. enable the proof explicitly; and
+6. run independent Michael and Carla sessions without retaining Job content, prompts, or model
+   responses in logs or repository evidence.
 
 ## Mandatory stop
 

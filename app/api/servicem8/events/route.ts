@@ -1,8 +1,15 @@
 import { getConfig } from "@/lib/config";
+import { issueAssistantSession } from "@/lib/security/assistant-session";
 import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import { loadPhaseZeroJobContext } from "@/lib/servicem8/job-context";
-import { renderError, renderJobContext, renderLaunchProof, renderMenuAssistant } from "@/lib/servicem8/render-context-html";
+import {
+  renderError,
+  renderJobContext,
+  renderLaunchProof,
+  renderMenuAssistant,
+  renderProofAssistant,
+} from "@/lib/servicem8/render-context-html";
 import { EventVerificationError, verifyServiceM8Event } from "@/lib/servicem8/verify-event";
 import { consumeEventHash } from "@/lib/storage/consumed-events";
 
@@ -23,7 +30,8 @@ function addonResponse(body: string, status = 200) {
 export async function POST(request: Request) {
   const requestId = correlationId();
   try {
-    const verified = await verifyServiceM8Event(await request.text(), getConfig().serviceM8AppSecret);
+    const config = getConfig();
+    const verified = await verifyServiceM8Event(await request.text(), config.serviceM8AppSecret);
     const replayExpiry = verified.event.exp
       ? new Date(verified.event.exp * 1000)
       : new Date(Date.now() + 10 * 60 * 1000);
@@ -51,6 +59,14 @@ export async function POST(request: Request) {
       await requireVendorAccount(client, verified.event.auth.accountUUID);
       const staff = await client.getStaff(verified.event.auth.staffUUID);
       safeLog("info", "Completed named global menu launch", identifiers);
+      if (config.assistantProof.enabled) {
+        const session = await issueAssistantSession(verified.event.auth, config.sessionSigningSecret);
+        return addonResponse(renderProofAssistant(
+          staff.first,
+          new URL("/assistant", config.appBaseUrl),
+          session,
+        ));
+      }
       return addonResponse(renderMenuAssistant(staff.first));
     }
 

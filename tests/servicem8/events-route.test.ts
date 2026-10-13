@@ -1,10 +1,17 @@
 import { SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
+const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistantSession, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
   consumeEventHash: vi.fn(async () => true),
   clientConstructor: vi.fn(),
+  getConfig: vi.fn(() => ({
+    appBaseUrl: new URL("https://office.example.test"),
+    serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
+    sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+    assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
+  })),
   getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
+  issueAssistantSession: vi.fn(async () => "signed-assistant-session"),
   requireVendorAccount: vi.fn(async () => undefined),
   loadPhaseZeroJobContext: vi.fn(async () => ({
     jobUUID: "0686ce69-4a5d-4f73-ad56-827ffaaced2b",
@@ -16,9 +23,8 @@ const { consumeEventHash, clientConstructor, getStaff, requireVendorAccount, loa
   safeLog: vi.fn(),
 }));
 
-vi.mock("@/lib/config", () => ({
-  getConfig: () => ({ serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough" }),
-}));
+vi.mock("@/lib/config", () => ({ getConfig }));
+vi.mock("@/lib/security/assistant-session", () => ({ issueAssistantSession }));
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
 vi.mock("@/lib/security/safe-log", () => ({
   correlationId: () => "test-request-id",
@@ -65,7 +71,15 @@ async function signFresh() {
 }
 
 describe("ServiceM8 event route", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getConfig.mockReturnValue({
+      appBaseUrl: new URL("https://office.example.test"),
+      serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
+      sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
+    });
+  });
 
   it("rejects an invalid signature before storage or API access", async () => {
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
@@ -133,6 +147,30 @@ describe("ServiceM8 event route", () => {
     expect(eventResponse).toContain("Leave: use ServiceM8 navigation");
     expect(eventResponse).toContain("No message leaves this page");
     expect(eventResponse).not.toContain("closeWindow");
+  });
+
+  it("mints a staff-bound server session when the bounded proof is enabled", async () => {
+    getConfig.mockReturnValueOnce({
+      appBaseUrl: new URL("https://office.example.test"),
+      serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
+      sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "proof-menu-launch" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(issueAssistantSession).toHaveBeenCalledWith({
+      accountUUID: event.auth.accountUUID,
+      staffUUID: event.auth.staffUUID,
+    }, "session-secret-with-at-least-thirty-two-bytes");
+    const { eventResponse } = await response.json();
+    expect(eventResponse).toContain('action="https://office.example.test/assistant"');
+    expect(eventResponse).toContain('name="session" value="signed-assistant-session"');
+    expect(eventResponse).not.toContain(event.auth.accountUUID);
+    expect(eventResponse).not.toContain(event.auth.staffUUID);
   });
 
   it("rejects a replayed fresh global menu launch before API access", async () => {
