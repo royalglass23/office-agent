@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "feature": "servicem8-callback-replay",
+  "commit": "8d17c2bd404571a4a0929fdc2fe655ca8cc874c3",
+  "command": null,
+  "retries": 0,
+  "environment": {
+    "name": "office-agent-staging Vercel project; isolated ServiceM8 tenant not provisioned",
+    "baseUrl": "https://office-agent-staging.vercel.app",
+    "production": true,
+    "fingerprint": null
+  },
+  "configHash": null,
+  "fixtureVersion": null,
+  "matrixHash": null,
+  "projects": [],
+  "coverage": {
+    "required": 7,
+    "covered": 0
+  },
+  "counts": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0
+  },
+  "artifacts": {
+    "report": null,
+    "traces": []
+  },
+  "verdict": "BLOCKED",
+  "blocker": "The staging Vercel project is reachable, but the only observed OAuth attempt used the live Royal Glass ServiceM8 tenant and failed closed when GET /vendor.json returned HTTP 402 before account binding. No authorised isolated ServiceM8 tenant, replay harness, dedicated Staff A/B fixtures, or second-account fixture is available."
+}

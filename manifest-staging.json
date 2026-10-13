@@ -1,0 +1,17 @@
+{
+  "$schema": "https://api.servicem8.com/api_1.0/addonsdk/manifest-schema/v1.json",
+  "name": "RG Office Assistant Staging",
+  "version": "0.2.0",
+  "oauth": {
+    "scope": "vendor read_jobs read_customers read_job_notes read_staff"
+  },
+  "actions": [],
+  "menuItems": [
+    {
+      "name": "RG Office Assistant Staging",
+      "type": "addon",
+      "iconURL": "https://office-agent-staging.vercel.app/icon.png",
+      "event": "rg_office_assistant_menu"
+    }
+  ]
+}

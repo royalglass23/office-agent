@@ -12,6 +12,7 @@ beforeEach(() => {
     SERVICEM8_APP_SECRET: "app-secret-with-enough-length",
     SERVICEM8_OAUTH_REDIRECT_URI: "https://office.example.test/api/servicem8/oauth/callback",
     SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff",
+    SERVICEM8_ALLOWED_ACCOUNT_UUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     DATABASE_URL: "postgres://unused",
     TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
     SESSION_SIGNING_SECRET: "session-secret-with-at-least-thirty-two-bytes",
@@ -29,6 +30,13 @@ afterEach(() => {
 });
 
 describe("bounded assistant proof configuration", () => {
+  it("requires one explicit allowed ServiceM8 account", () => {
+    expect(getConfig().allowedAccountUUID).toBe("5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b");
+    resetConfigForTests();
+    delete process.env.SERVICEM8_ALLOWED_ACCOUNT_UUID;
+    expect(() => getConfig()).toThrow("SERVICEM8_ALLOWED_ACCOUNT_UUID");
+  });
+
   it("stays disabled without OpenAI credentials", () => {
     expect(getConfig().assistantProof).toEqual({ enabled: false });
   });

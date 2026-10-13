@@ -1,6 +1,7 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import {
+  renderConversationDraftPrompt,
   renderJobContext,
   renderJobMatches,
   renderEmailDraft,
@@ -59,6 +60,19 @@ describe("renderMenuAssistant", () => {
 });
 
 describe("proof result rendering", () => {
+  it("escapes conversational staff text before rendering a draft prompt", () => {
+    const html = renderConversationDraftPrompt(
+      '<script>alert("message")</script> Draft an email for R260766',
+      "R260766",
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+
+    expect(html).toContain('&lt;script&gt;alert(&quot;message&quot;)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert("message")</script>');
+    expect(html).toContain("Nothing will be sent");
+  });
+
   it("requires explicit selection when several Jobs match", () => {
     const html = renderJobMatches(
       [
@@ -122,6 +136,8 @@ describe("proof result rendering", () => {
     expect(html).not.toContain("<script>alert('body')</script>");
     expect(html).not.toContain("Send email");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
+    expect(html).toContain('name="message"');
+    expect(html).toContain("Ask another question");
   });
 });
 

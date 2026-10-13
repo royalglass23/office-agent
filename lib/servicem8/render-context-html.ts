@@ -107,18 +107,63 @@ function citations(values: readonly string[]) {
   return `<span class="sources">Sources: ${values.map(escapeHtml).join(", ")}</span>`;
 }
 
-export function renderProofAnswer(answer: RenderableProofAnswer, actionUrl: URL, sessionToken: string) {
+function proofAnswerContent(answer: RenderableProofAnswer) {
   const timeline = answer.timeline.length === 0
     ? "<p>No dated events were found in the included evidence.</p>"
     : `<ol class="timeline">${answer.timeline.map((item) => `<li><time datetime="${escapeHtml(item.at)}">${escapeHtml(item.at.replace("T", " ").replace(".000Z", " UTC"))}</time><p>${escapeHtml(item.text)}</p>${citations(item.citations)}</li>`).join("")}</ol>`;
   const partial = answer.coverage.truncated ? " The included evidence was truncated." : "";
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>What happened — ${escapeHtml(answer.job.jobNumber)}</h1>
+  return `<h2>What happened — ${escapeHtml(answer.job.jobNumber)}</h2>
 <dl><dt>Address</dt><dd>${escapeHtml(answer.job.address || "Not supplied")}</dd><dt>Customer</dt><dd>${escapeHtml(answer.job.customerName || "Not supplied")}</dd><dt>Status</dt><dd>${escapeHtml(answer.job.status || "Not supplied")}</dd></dl>
-<h2>Summary</h2><p class="summary">${escapeHtml(answer.summary.text)}</p>${citations(answer.summary.citations)}
-<h2>Evidence timeline</h2>${timeline}
-<p class="coverage"><strong>Coverage:</strong> ${escapeHtml(answer.coverage.included.join(" and "))}. Not checked: ${escapeHtml(answer.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>
+<h3>Summary</h3><p class="summary">${escapeHtml(answer.summary.text)}</p>${citations(answer.summary.citations)}
+<h3>Evidence timeline</h3>${timeline}
+<p class="coverage"><strong>Coverage:</strong> ${escapeHtml(answer.coverage.included.join(" and "))}. Not checked: ${escapeHtml(answer.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>`;
+}
+
+export function renderProofAnswer(answer: RenderableProofAnswer, actionUrl: URL, sessionToken: string) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Selected Job result</h1>${proofAnswerContent(answer)}
 <h2>Draft an email</h2>${emailDraftForm(answer.job.jobNumber, actionUrl, sessionToken)}
 <h2>Check another Job</h2>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
+}
+
+const conversationStyles = `${proofStyles}.conversation{padding:18px;margin:20px 0;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.message{max-width:86%;padding:12px 14px;margin:0 0 14px;border-radius:12px;background:#fff;box-shadow:0 1px 2px #0001}.message.staff{margin-left:auto;background:#dcecff}.message.assistant{margin-right:auto}.message h2,.message h3{margin-top:14px}.chat-form{margin-top:18px}.composer{display:flex;gap:10px;align-items:end}@media(max-width:560px){.message{max-width:94%}.composer{align-items:stretch;flex-direction:column}}`;
+
+function conversationForm(actionUrl: URL, sessionToken: string) {
+  return `<form class="chat-form" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<label for="message">Message</label><div class="composer"><textarea id="message" name="message" rows="2" maxlength="500" required placeholder="e.g. What happened to R260766?"></textarea><button type="submit" data-pending-label="Checking…">Send</button></div><p class="privacy">Read-only. Nothing is sent or saved to ServiceM8.</p></form>`;
+}
+
+export function renderConversationGuidance(
+  staffMessage: string,
+  guidance: string,
+  actionUrl: URL,
+  sessionToken: string,
+) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>${escapeHtml(guidance)}</p></div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+}
+
+export function renderConversationAssistant(
+  staffFirstName: string,
+  actionUrl: URL,
+  sessionToken: string,
+) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Hi, ${escapeHtml(staffFirstName)}—what can I help with?</h1><section class="conversation" aria-live="polite"><div class="message assistant"><p>I can help with two read-only tasks:</p><ul><li>What happened to an exact Job number?</li><li>Prepare a review-only email draft for an exact Job number.</li></ul><p>For example: <strong>What happened to R260766?</strong></p></div></section>${conversationForm(actionUrl, sessionToken)}<p class="coverage"><strong>Coverage:</strong> core Job/customer fields and Job diary notes. Not checked: email, SMS, forms, attachments, schedule activity.</p></main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+}
+
+export function renderConversationProofAnswer(
+  staffMessage: string,
+  answer: RenderableProofAnswer,
+  actionUrl: URL,
+  sessionToken: string,
+) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant">${proofAnswerContent(answer)}<h3>Want an email draft?</h3>${emailDraftForm(answer.job.jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+}
+
+export function renderConversationDraftPrompt(
+  staffMessage: string,
+  jobNumber: string,
+  actionUrl: URL,
+  sessionToken: string,
+) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>I can prepare a review-only draft for ${escapeHtml(jobNumber)}.</p>${emailDraftForm(jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 type RenderableEmailDraft = {
@@ -136,7 +181,7 @@ export function renderEmailDraft(result: RenderableEmailDraft, actionUrl: URL, s
 <section class="draft-card"><h2>Subject</h2><p>${escapeHtml(result.draft.subject)}</p><h2>Body</h2><pre class="draft-body">${escapeHtml(result.draft.body)}</pre>${citations(result.draft.citations)}</section>
 <p class="coverage"><strong>Coverage:</strong> ${escapeHtml(result.coverage.included.join(" and "))}. Not checked: ${escapeHtml(result.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>
 <h2>Draft another version</h2>${emailDraftForm(result.job.jobNumber, actionUrl, sessionToken)}
-<h2>Check another Job</h2>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
+<h2>Ask another question</h2>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 export function renderJobContext(event: ServiceM8JobEvent, context: PhaseZeroJobContext) {
