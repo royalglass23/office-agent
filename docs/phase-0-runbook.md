@@ -97,9 +97,10 @@ Production acceptance-test Job references supplied on 13 October 2026:
 
 The owner confirmed on 13 October 2026 that the five-Job access restriction should be removed. The
 application may search account-wide Jobs and send bounded core/customer fields and diary-note text
-from the staff-selected Job to OpenAI only for the read-only “What happened?” workflow. This does
-not authorise new data sources, providers, write actions, outbound actions, or future features. The
-specific OpenAI model is deployment configuration and must be recorded with the test evidence.
+from the staff-selected Job to OpenAI only for the read-only “What happened?” workflow or the
+review-only Email Draft proof. This does not authorise new data sources, providers, write actions,
+outbound actions, or future features. The specific OpenAI model is deployment configuration and
+must be recorded with the test evidence.
 
 ## Bounded “What happened?” implementation candidate
 
@@ -111,6 +112,19 @@ repeats the selected parent Job read before customer/Note access, sends the sign
 every ServiceM8 read, and requests a non-stored strict JSON-schema response from the configured
 OpenAI model. The model returns only up to three authorised evidence IDs; server code constructs
 all displayed summary and timeline text from the corresponding normalised ServiceM8 evidence.
+
+On 13 October 2026, the owner reported that all five supplied Job-number checks worked in
+independent Michael and Carla sessions, with correct staff separation and no ServiceM8 writes or
+outbound messages. Address search remains a known deferred defect: unrelated legacy Jobs with an
+empty Company UUID can abort the account-wide scan. The accepted proof therefore covers exact Job
+number selection only and must not be represented as working natural-language address search.
+
+After that acceptance, the owner explicitly authorised a second bounded outcome: staff may enter
+an email purpose for the Selected Job and receive a review-only subject/body draft from the same
+core Job/customer fields and Job diary notes. The assistant must not send or save the draft, and
+must continue to disclose excluded sources. OpenAI selects only authorised evidence IDs for this
+outcome; server code constructs the displayed subject and body from the normalised staff purpose
+and selected-Job data, so model-authored claims are never displayed.
 
 This is local implementation evidence only. Before a production proof:
 

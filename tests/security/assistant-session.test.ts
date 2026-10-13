@@ -59,4 +59,12 @@ describe("staff-bound assistant session", () => {
     expect(first.hash).not.toBe(nextBucket.hash);
     expect(first.expiresAt.toISOString()).toBe("2030-01-01T00:02:00.000Z");
   });
+
+  it("keeps email drafting in a separate expensive-work bucket", () => {
+    const summary = assistantRateLimit(identity, "summary", new Date("2030-01-01T00:00:01Z"));
+    const draft = assistantRateLimit(identity, "draft", new Date("2030-01-01T00:00:01Z"));
+
+    expect(draft.hash).not.toBe(summary.hash);
+    expect(draft.expiresAt.toISOString()).toBe("2030-01-01T00:02:00.000Z");
+  });
 });

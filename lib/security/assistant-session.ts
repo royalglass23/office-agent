@@ -22,10 +22,10 @@ export function assistantSessionHash(token: string) {
 
 export function assistantRateLimit(
   identity: AssistantIdentity,
-  action: "search" | "summary",
+  action: "search" | "summary" | "draft",
   now = new Date(),
 ) {
-  const windowSeconds = action === "summary" ? 60 : 10;
+  const windowSeconds = action === "search" ? 10 : 60;
   const currentSeconds = Math.floor(now.getTime() / 1000);
   const bucket = Math.floor(currentSeconds / windowSeconds);
   return {

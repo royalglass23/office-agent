@@ -46,6 +46,10 @@ export default function Home() {
             <dt>“What happened?” proof</dt>
             <dd>{config.assistantProof.enabled ? "Enabled" : "Disabled"}</dd>
           </div>
+          <div>
+            <dt>Email Draft proof</dt>
+            <dd>{config.assistantProof.enabled ? "Enabled" : "Disabled"}</dd>
+          </div>
         </dl>
 
         <p className={styles.note}>

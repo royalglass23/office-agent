@@ -1,4 +1,5 @@
 import { getConfig } from "@/lib/config";
+import { createOpenAIEmailDrafter, OpenAIEmailDraftError } from "@/lib/openai/email-drafter";
 import { createOpenAIProofSummarizer, OpenAIProofError } from "@/lib/openai/proof-summarizer";
 import {
   assistantRateLimit,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
 import {
+  renderEmailDraft,
   renderJobMatches,
   renderProofAnswer,
   renderProofMessage,
@@ -54,10 +56,20 @@ async function readForm(request: Request) {
   const session = singleton("session", 4_096);
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
+  const purposeValues = form.getAll("emailPurpose");
   if (queryValues.length + jobValues.length !== 1) throw new AssistantInputError("Choose a search or one Job");
   if (queryValues.length === 1 && queryValues[0].length > 200) throw new AssistantInputError("Search is too long");
   if (jobValues.length === 1 && !/^[A-Z]\d{6}$/.test(jobValues[0])) throw new AssistantInputError("Invalid Job number");
-  return { session, query: queryValues[0]?.trim(), jobNumber: jobValues[0] };
+  if (purposeValues.length > 1 || (purposeValues.length === 1 && (purposeValues[0].trim().length === 0 || purposeValues[0].length > 500))) {
+    throw new AssistantInputError("Invalid email purpose");
+  }
+  if (purposeValues.length === 1 && jobValues.length !== 1) throw new AssistantInputError("Email draft requires one Job");
+  return {
+    session,
+    query: queryValues[0]?.trim(),
+    jobNumber: jobValues[0],
+    emailPurpose: purposeValues[0]?.trim(),
+  };
 }
 
 export async function POST(request: Request) {
@@ -77,11 +89,11 @@ export async function POST(request: Request) {
       return html(renderProofMessage("Session already used", "Reopen the Office Assistant from ServiceM8."), 409);
     }
 
-    const takeRateLimit = async (action: "search" | "summary") => {
+    const takeRateLimit = async (action: "search" | "summary" | "draft") => {
       const limit = assistantRateLimit(identity, action);
       if (!(await consumeEventHash(limit.hash, limit.expiresAt))) throw new AssistantRateLimitError();
     };
-    await takeRateLimit(form.jobNumber ? "summary" : "search");
+    await takeRateLimit(form.emailPurpose ? "draft" : form.jobNumber ? "summary" : "search");
 
     const logContext = {
       requestId,
@@ -96,6 +108,10 @@ export async function POST(request: Request) {
         apiKey: config.assistantProof.apiKey,
         model: config.assistantProof.model,
       }),
+      drafter: createOpenAIEmailDrafter({
+        apiKey: config.assistantProof.apiKey,
+        model: config.assistantProof.model,
+      }),
     });
     const actionUrl = new URL("/assistant", config.appBaseUrl);
     const nextSession = await issueAssistantSession(
@@ -104,6 +120,12 @@ export async function POST(request: Request) {
       new Date(),
       identity.launchExpiresAt,
     );
+
+    if (form.jobNumber && form.emailPurpose) {
+      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose);
+      safeLog("info", "Completed selected Job email draft proof", logContext);
+      return html(renderEmailDraft(result, actionUrl, nextSession));
+    }
 
     if (form.jobNumber) {
       const answer = await proof.answerWhatHappened(form.jobNumber);
@@ -147,6 +169,10 @@ export async function POST(request: Request) {
     if (error instanceof OpenAIProofError) {
       safeLog("warn", "OpenAI assistant proof failed closed", { requestId, status: error.status });
       return html(renderProofMessage("Unable to summarise this Job", "No AI answer was accepted. Try again later."), 502);
+    }
+    if (error instanceof OpenAIEmailDraftError) {
+      safeLog("warn", "OpenAI email draft proof failed closed", { requestId, status: error.status });
+      return html(renderProofMessage("Unable to draft this email", "No email draft was accepted. Nothing was sent."), 502);
     }
     if (error instanceof Error && error.message === "Assistant session is invalid") {
       return html(renderProofMessage("Session expired", "Reopen the Office Assistant from ServiceM8."), 401);

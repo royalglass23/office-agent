@@ -101,17 +101,23 @@ Structured access tokens, callback identity, account fields, contact fields, and
 are not forwarded. Recognisable email addresses, phone numbers, UUIDs, and JWT-shaped strings in
 free-form text are redacted. This pattern-based filtering cannot guarantee removal of every secret
 or personal detail. The owner has made a bounded privacy decision allowing OpenAI API use for the
-staff-selected Job and only for the read-only “What happened?” workflow.
+staff-selected Job only for the read-only “What happened?” workflow and the review-only Email Draft
+proof. Both use the same bounded evidence; the Email Draft request also includes the normalised
+staff-supplied purpose.
 
 ## What “Job Diary” means through the documented API
 
 ### Approved initial evidence boundary
 
 The first Office Assistant proof uses only core Selected Job and customer fields plus Job diary
-notes. Its only conversational outcome is a read-only account of what happened on the Selected
-Job. Email Drafts and Suggested Next Actions are deferred along with email, SMS, forms,
-attachments, and schedule activity. These capabilities and sources are not considered unimportant:
-missing one of them can materially change what staff should do next.
+notes. Its initial conversational outcome was a read-only account of what happened on the Selected
+Job. After the owner accepted that live proof on 13 October 2026, they explicitly authorised a
+review-only Email Draft proof using the same evidence and a staff-supplied purpose. The assistant
+does not send or save the draft. OpenAI selects relevant evidence IDs, while server code constructs
+every visible word of the subject and body from the normalised purpose and selected-Job data.
+Suggested Next Actions remain deferred along with email history,
+SMS, forms, attachments, and schedule activity. These capabilities and sources are not considered
+unimportant: missing one of them can materially change what staff should do next.
 
 For this proof, the answer is presented as a short plain-English summary followed by a dated
 evidence timeline. The format is provisional and may change after staff have verified the proof.

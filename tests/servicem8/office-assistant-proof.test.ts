@@ -108,6 +108,128 @@ describe("bounded Office Assistant proof", () => {
     expect(summarize).toHaveBeenCalledOnce();
   });
 
+  it("creates a grounded draft for a selected Job without sending anything", async () => {
+    const proofReader = reader();
+    const draft = vi.fn(async () => ({
+      citations: ["company:record", "note:1"],
+    }));
+    const proof = createOfficeAssistantProof({
+      reader: proofReader,
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft },
+      now: () => new Date("2026-10-13T00:00:00Z"),
+    });
+
+    await expect(proof.draftEmail("R260766", "Follow up after the site measure")).resolves.toEqual({
+      job: { jobNumber: "R260766", address: "10 Queen Street, Auckland", customerName: "Example Customer" },
+      purpose: "Follow up after the site measure",
+      draft: {
+        subject: "Follow up after the site measure — R260766",
+        body: [
+          "Hi Example Customer,",
+          "",
+          "I'm writing regarding Job R260766 at 10 Queen Street, Auckland.",
+          "",
+          "Site measure completed.",
+          "",
+          "Kind regards,",
+          "Royal Glass",
+        ].join("\n"),
+        citations: ["job:record", "company:record", "note:1"],
+      },
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    });
+    expect(draft).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: "note:1", text: "Site measure completed." })]),
+      "Follow up after the site measure",
+    );
+    expect(proofReader.getJob).toHaveBeenCalledWith(jobOne.uuid);
+  });
+
+  it("redacts credentials in the staff purpose before requesting an email draft", async () => {
+    const draft = vi.fn(async () => ({ subject: "Update", body: "Draft body", citations: ["job:record"] }));
+    const proof = createOfficeAssistantProof({
+      reader: reader(),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft },
+    });
+
+    await proof.draftEmail("R260766", "Follow up using api_key=secret123");
+
+    expect(draft).toHaveBeenCalledWith(expect.any(Array), "Follow up using api_key=[secret redacted]");
+  });
+
+  it("rejects an email draft whose citations are outside the selected Job evidence", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(),
+      summarizer: { summarize: vi.fn() },
+      drafter: {
+        draft: async () => ({ subject: "Update", body: "An unsupported claim", citations: ["email:not-read"] }),
+      },
+    });
+
+    await expect(proof.draftEmail("R260766", "Give the customer an update")).rejects.toThrow(
+      "Email draft has an unsupported citation",
+    );
+  });
+
+  it("never displays model-authored facts even when they cite authorised evidence", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(),
+      summarizer: { summarize: vi.fn() },
+      drafter: {
+        draft: async () => ({
+          subject: "Price confirmed at $500",
+          body: "The customer agreed to pay $500 tomorrow.",
+          citations: ["job:record"],
+        }),
+      },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.subject).not.toContain("$500");
+    expect(result.draft.body).not.toContain("$500");
+    expect(result.draft.body).not.toContain("agreed to pay");
+    expect(result.draft.citations).toEqual(["job:record", "company:record"]);
+  });
+
+  it("keeps the server-built email body within the established display limit", async () => {
+    const notes = [
+      ["fdbe8af2-7590-48cc-8341-e5385879ba33", "A"],
+      ["cb713735-8707-4c57-adbe-019b549c126b", "B"],
+      ["c8fa065e-0983-4177-a6f0-136aec61030c", "C"],
+    ].map(([uuid, value], index) => ({
+      uuid,
+      jobUUID: jobOne.uuid,
+      text: value.repeat(2_000),
+      createdAt: `2026-09-0${index + 2}T10:30:00Z`,
+    }));
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes, nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1", "note:2", "note:3"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.body.length).toBeLessThanOrEqual(5_000);
+    expect(result.draft.body).toContain("Kind regards,\nRoyal Glass");
+    expect(result.draft.citations).toEqual([
+      "job:record",
+      "company:record",
+      "note:1",
+      "note:2",
+      "note:3",
+    ]);
+  });
+
   it("reauthorises the selected parent Job before reading customer and notes", async () => {
     const order: string[] = [];
     const proofReader = reader({

@@ -37,9 +37,9 @@ the Selected Job until the staff member explicitly chooses it.
 _Avoid_: Search hit, assumed Job
 
 **Approved Proof Provider**:
-OpenAI's API, used only for the staff-selected Job and the read-only “What happened?” Proof Answer.
-The model remains configuration rather than a domain concept, and this approval does not extend to
-other sources, purposes, providers, or unselected Jobs.
+OpenAI's API, used only for the staff-selected Job and the read-only “What happened?” Proof Answer
+or review-only Email Draft. The model remains configuration rather than a domain concept, and this
+approval does not extend to other sources, purposes, providers, or unselected Jobs.
 _Avoid_: General AI approval, unrestricted production AI
 
 **Observed Job Facts**:
@@ -70,6 +70,8 @@ task, assignment, or approval. This capability is deferred until the initial rea
 _Avoid_: Next step, automated action
 
 **Email Draft**:
-Proposed email text shown to staff for review and copying. It is never sent by the Office Assistant.
-Email Draft generation is deferred until the initial read-only proof works.
+Proposed email subject and body constructed by server code for a deliberately Selected Job and a
+staff-supplied purpose, using evidence IDs selected by the Approved Proof Provider from the same
+Initial Job Context as the Proof Answer. It is shown for review and copying and is never sent or
+saved to ServiceM8 by the Office Assistant.
 _Avoid_: Email, outbound message

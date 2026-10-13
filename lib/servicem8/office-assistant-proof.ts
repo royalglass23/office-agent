@@ -7,6 +7,7 @@ const MAX_NOTES = 200;
 const MAX_NOTE_PAGES = 20;
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_TOTAL_NOTE_TEXT = 20_000;
+const MAX_EMAIL_BODY_LENGTH = 5_000;
 
 const jobSchema = z.object({
   uuid: uuidSchema,
@@ -58,6 +59,10 @@ export type ProofSummarizer = {
   summarize(evidence: readonly ProofEvidence[]): Promise<{ summary: { citations: string[] } }>;
 };
 
+export type ProofEmailDrafter = {
+  draft(evidence: readonly ProofEvidence[], purpose: string): Promise<{ citations: string[] }>;
+};
+
 export class ProofResolutionError extends Error {
   constructor() {
     super("Selected Job could not be resolved uniquely");
@@ -75,6 +80,7 @@ export class ProofSearchTooBroadError extends Error {
 type Dependencies = {
   reader: ProofReader;
   summarizer: ProofSummarizer;
+  drafter?: ProofEmailDrafter;
   now?: () => Date;
 };
 
@@ -135,6 +141,60 @@ function evidenceTimeline(evidence: readonly ProofEvidence[]) {
     .sort((left, right) => left.at.localeCompare(right.at));
 }
 
+function buildEmailDraft(
+  selection: { citations: string[] },
+  evidence: readonly ProofEvidence[],
+  job: ProofJob,
+  company: ProofCompany,
+  purpose: string,
+) {
+  const references = new Set(evidence.map((item) => item.id));
+  const selected = selection.citations;
+  if (
+    !Array.isArray(selected) || selected.length === 0 || selected.length > 5 ||
+    new Set(selected).size !== selected.length || selected.some((citation) => !references.has(citation))
+  ) {
+    throw new Error("Email draft has an unsupported citation");
+  }
+
+  const selectedNotes = selected
+    .filter((citation) => citation.startsWith("note:"))
+    .map((citation) => evidence.find((item) => item.id === citation))
+    .filter((item): item is ProofEvidence => item !== undefined);
+  const customerName = normalizeText(company.name) || "there";
+  const normalizedAddress = normalizeText(job.address);
+  const address = normalizedAddress ? ` at ${normalizedAddress}` : "";
+  const prefix = [
+    `Hi ${customerName},`,
+    "",
+    `I'm writing regarding Job ${job.jobNumber}${address}.`,
+  ].join("\n") + "\n\n";
+  const suffix = "\n\nKind regards,\nRoyal Glass";
+  const availableEvidenceLength = MAX_EMAIL_BODY_LENGTH - prefix.length - suffix.length;
+  const includedNotes: ProofEvidence[] = [];
+  let factualUpdate = "";
+  for (const note of selectedNotes) {
+    const separator = factualUpdate ? "\n\n" : "";
+    const remaining = availableEvidenceLength - factualUpdate.length - separator.length;
+    if (remaining <= 0) break;
+    const text = note.text.slice(0, remaining);
+    factualUpdate += `${separator}${text}`;
+    includedNotes.push(note);
+    if (text.length < note.text.length) break;
+  }
+  if (!factualUpdate) {
+    factualUpdate = `The Job is currently recorded as ${normalizeText(job.status) || "status not supplied"}.`
+      .slice(0, availableEvidenceLength);
+  }
+  const subjectPrefix = purpose.slice(0, Math.max(1, 200 - job.jobNumber.length - 3)).trim();
+
+  return {
+    subject: `${subjectPrefix} — ${job.jobNumber}`,
+    body: `${prefix}${factualUpdate}${suffix}`,
+    citations: ["job:record", "company:record", ...includedNotes.map((note) => note.id)],
+  };
+}
+
 function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
   const description = normalizeText(job.jobDescription);
   const workDone = normalizeText(job.workDoneDescription);
@@ -151,12 +211,70 @@ function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
   ];
 }
 
-export function createOfficeAssistantProof({ reader, summarizer, now = () => new Date() }: Dependencies) {
+export function createOfficeAssistantProof({ reader, summarizer, drafter, now = () => new Date() }: Dependencies) {
   async function jobsByNumber(jobNumbers: readonly string[]) {
     const rows = await reader.listJobsByNumber(jobNumbers);
     return rows
       .map((row) => jobSchema.parse(row))
       .filter((job) => jobNumbers.includes(job.jobNumber));
+  }
+
+  async function selectedJobEvidence(requestedJobNumber: string) {
+    const jobNumber = requestedJobNumber.trim().toUpperCase();
+    const matches = await jobsByNumber([jobNumber]);
+    if (matches.length !== 1) throw new ProofResolutionError();
+    const listedJob = matches[0];
+    const job = jobSchema.parse(await reader.getJob(listedJob.uuid));
+    if (job.uuid !== listedJob.uuid || job.jobNumber !== jobNumber) {
+      throw new Error("ServiceM8 returned a different Job");
+    }
+
+    const company = companySchema.parse(await reader.getCompany(job.companyUUID));
+    if (company.uuid !== job.companyUUID) throw new Error("ServiceM8 returned a different Company");
+
+    const evidence = jobEvidence(job, company);
+    const noteIds = new Set<string>();
+    const cursors = new Set<string>();
+    let cursor: string | null = null;
+    let noteTextLength = 0;
+    let truncated = false;
+
+    for (let page = 0; page < MAX_NOTE_PAGES; page += 1) {
+      const result = await reader.readNotesPage(job.uuid, cursor);
+      for (const rawNote of result.notes) {
+        const note = noteSchema.parse(rawNote);
+        if (note.jobUUID !== job.uuid) throw new Error("ServiceM8 returned a Note for a different Job");
+        if (noteIds.has(note.uuid)) continue;
+        const text = normalizeText(note.text);
+        if (evidence.length - 2 === MAX_NOTES || noteTextLength + text.length > MAX_TOTAL_NOTE_TEXT) {
+          truncated = true;
+          break;
+        }
+        noteIds.add(note.uuid);
+        const clipped = text.slice(0, MAX_TEXT_LENGTH);
+        evidence.push({ id: `note:${evidence.length - 1}`, at: normalizeDate(note.createdAt), text: clipped });
+        noteTextLength += clipped.length;
+        if (text.length > clipped.length) truncated = true;
+      }
+      if (truncated || result.nextCursor === null) break;
+      if (cursors.has(result.nextCursor)) throw new Error("Repeated Note page cursor");
+      cursors.add(result.nextCursor);
+      cursor = result.nextCursor;
+      if (page === MAX_NOTE_PAGES - 1) truncated = true;
+    }
+
+    return {
+      job,
+      company,
+      evidence,
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: evidence.length - 2,
+        truncated,
+        snapshotAt: now().toISOString(),
+      },
+    };
   }
 
   return {
@@ -188,62 +306,29 @@ export function createOfficeAssistantProof({ reader, summarizer, now = () => new
     },
 
     async answerWhatHappened(requestedJobNumber: string) {
-      const jobNumber = requestedJobNumber.trim().toUpperCase();
-      const matches = await jobsByNumber([jobNumber]);
-      if (matches.length !== 1) throw new ProofResolutionError();
-      const listedJob = matches[0];
-      const job = jobSchema.parse(await reader.getJob(listedJob.uuid));
-      if (job.uuid !== listedJob.uuid || job.jobNumber !== jobNumber) {
-        throw new Error("ServiceM8 returned a different Job");
-      }
-
-      const company = companySchema.parse(await reader.getCompany(job.companyUUID));
-      if (company.uuid !== job.companyUUID) throw new Error("ServiceM8 returned a different Company");
-
-      const evidence = jobEvidence(job, company);
-      const noteIds = new Set<string>();
-      const cursors = new Set<string>();
-      let cursor: string | null = null;
-      let noteTextLength = 0;
-      let truncated = false;
-
-      for (let page = 0; page < MAX_NOTE_PAGES; page += 1) {
-        const result = await reader.readNotesPage(job.uuid, cursor);
-        for (const rawNote of result.notes) {
-          const note = noteSchema.parse(rawNote);
-          if (note.jobUUID !== job.uuid) throw new Error("ServiceM8 returned a Note for a different Job");
-          if (noteIds.has(note.uuid)) continue;
-          const text = normalizeText(note.text);
-          if (evidence.length - 2 === MAX_NOTES || noteTextLength + text.length > MAX_TOTAL_NOTE_TEXT) {
-            truncated = true;
-            break;
-          }
-          noteIds.add(note.uuid);
-          const clipped = text.slice(0, MAX_TEXT_LENGTH);
-          evidence.push({ id: `note:${evidence.length - 1}`, at: normalizeDate(note.createdAt), text: clipped });
-          noteTextLength += clipped.length;
-          if (text.length > clipped.length) truncated = true;
-        }
-        if (truncated || result.nextCursor === null) break;
-        if (cursors.has(result.nextCursor)) throw new Error("Repeated Note page cursor");
-        cursors.add(result.nextCursor);
-        cursor = result.nextCursor;
-        if (page === MAX_NOTE_PAGES - 1) truncated = true;
-      }
-
+      const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
       const content = await summarizer.summarize(evidence);
       const summary = buildSummary(content, evidence, job);
       return {
         job: { jobNumber: job.jobNumber, address: job.address, status: job.status, customerName: company.name },
         summary,
         timeline: evidenceTimeline(evidence),
-        coverage: {
-          included: ["core Job/customer fields", "Job diary notes"],
-          excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
-          noteCount: evidence.length - 2,
-          truncated,
-          snapshotAt: now().toISOString(),
-        },
+        coverage,
+      };
+    },
+
+    async draftEmail(requestedJobNumber: string, requestedPurpose: string) {
+      if (!drafter) throw new Error("Email drafting is not configured");
+      const purpose = normalizeText(requestedPurpose.trim());
+      if (!purpose || purpose.length > 500) throw new Error("Email purpose is invalid");
+      const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
+      const selection = await drafter.draft(evidence, purpose);
+      const draft = buildEmailDraft(selection, evidence, job, company, purpose);
+      return {
+        job: { jobNumber: job.jobNumber, address: job.address, customerName: company.name },
+        purpose,
+        draft,
+        coverage,
       };
     },
   };

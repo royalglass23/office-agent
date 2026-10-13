@@ -10,7 +10,7 @@ const {
   requireVendorAccount,
   verifyAssistantSession,
 } = vi.hoisted(() => {
-  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn() };
+  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
   return {
     clientConstructor: vi.fn(),
     consumeEventHash: vi.fn(async () => true),
@@ -144,5 +144,38 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).toHaveBeenCalledWith("R260766");
     expect(await response.text()).toContain("The site measure was completed.");
     expect(issueAssistantSession).toHaveBeenCalled();
+  });
+
+  it("returns a review-only email draft for one selected Job and purpose", async () => {
+    proof.draftEmail.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Follow up on the site measure",
+      draft: {
+        subject: "Site measure follow-up",
+        body: "Hi Example,\n\nThe site measure has been completed.",
+        citations: ["company:record", "note:1"],
+      },
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    });
+
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailPurpose: "Follow up on the site measure",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+    const body = await response.text();
+    expect(body).toContain("Site measure follow-up");
+    expect(body).toContain("nothing was sent");
+    expect(body).not.toContain("Send email");
   });
 });

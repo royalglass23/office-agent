@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   renderJobContext,
   renderJobMatches,
+  renderEmailDraft,
   renderMenuAssistant,
   renderProofAnswer,
   renderProofAssistant,
@@ -89,6 +90,37 @@ describe("proof result rendering", () => {
     expect(html).toContain("What happened");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
+    expect(html).toContain('name="emailPurpose"');
+    expect(html).toContain('value="R260766"');
+    expect(html).toContain("Draft email");
+    expect(html).toContain("Nothing will be sent");
+  });
+
+  it("renders an escaped review-only email draft with no send action", () => {
+    const html = renderEmailDraft({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Follow up on the measure",
+      draft: {
+        subject: "<script>alert('subject')</script>",
+        body: "Hi Example,\n<script>alert('body')</script>",
+        citations: ["job:record", "note:1"],
+      },
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    }, new URL("https://office.example.test/assistant"), "signed-session-token");
+
+    expect(html).toContain("Email draft — R260766");
+    expect(html).toContain("Draft only — nothing was sent");
+    expect(html).toContain("&lt;script&gt;alert(&#39;subject&#39;)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(&#39;body&#39;)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert('body')</script>");
+    expect(html).not.toContain("Send email");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
   });
 });

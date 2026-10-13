@@ -3,10 +3,12 @@
 Read-only ServiceM8 Office Assistant proof. A fresh, one-time global Add-ons-menu launch binds a
 short-lived server session to the signed staff identity. Staff can search the connected ServiceM8
 account by address or Job number and ask “What happened?”. The answer uses bounded core Job/customer
-fields and Job notes from the staff-selected Job. OpenAI selects up to three authorised evidence
-references; the server builds the visible summary and dated evidence timeline directly from those
-records. Email, SMS, forms, attachments, schedule activity, writes, and outbound messages remain
-excluded.
+fields and Job notes from the staff-selected Job. OpenAI selects authorised evidence references;
+the server builds the visible summary and dated evidence timeline directly from those records.
+After reviewing that result, staff can provide a purpose and create a review-only email draft from
+the same bounded evidence. OpenAI selects relevant evidence IDs and server code constructs every
+visible word of the draft. The assistant does not send or save it. Email history, SMS,
+forms, attachments, schedule activity, writes, and outbound messages remain excluded.
 
 ## Local checks
 
