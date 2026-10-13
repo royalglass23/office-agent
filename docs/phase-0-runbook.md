@@ -141,30 +141,9 @@ Evidence obtained: The owner confirmed the live Michael and Carla checks passed 
 Unresolved findings: Natural-language address search remains deferred and must not be represented
   as accepted. No Phase 0 gate blocker remains.
 Gate result: PASS
-User authorised transition: YES
-Authorisation reference: On 13 October 2026 the owner explicitly instructed Codex to reconcile
-  the obsolete Phase 0 security records and start the bounded Phase 1 global Add-ons-menu
-  conversational assistant.
+User authorised transition: NO
+Authorisation reference: Awaiting an explicit instruction to start Phase 1.
 ```
-
-## Authorised Phase 1 boundary — 13 October 2026
-
-Phase 1 starts as a narrow extension of the accepted production proofs, not as a general-purpose
-agent. A fresh Global Launch opens a staff-bound conversation. For this first slice, the staff
-member supplies exactly one Job number and may ask either what happened or for an email draft. The
-existing proof readers continue to use only core Job/customer fields and Job diary notes. Email,
-SMS, forms, attachments, schedule activity, additional providers, persistent transcripts, writes,
-sending, and autonomous actions remain excluded.
-
-The claimless Job Action route remains data-disabled. Natural-language intent is supported, but
-natural-language address search remains deferred because its Phase 0 defect was not accepted. Each
-form submission uses a fresh one-time staff-bound session; unsupported requests and requests with
-zero or several Job numbers stop before ServiceM8 access.
-
-The historical strict-E2E security audit remains `BLOCKED` for claimless Job Actions, isolated
-multi-account/restricted-role claims, and any later expansion. Its former blanket statement that it
-blocks all Phase 1 work is superseded only for this single-account, global-menu, read-only boundary.
-See `security/servicem8-callback-replay/scope-reconciliation.md`.
 
 For a future deployment or repeat of this production proof:
 

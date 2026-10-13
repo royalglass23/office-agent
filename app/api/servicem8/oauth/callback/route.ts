@@ -1,4 +1,3 @@
-import { getConfig } from "@/lib/config";
 import { adminSessionCookie, createAdminSession } from "@/lib/security/admin-session";
 import { redactIdentifier, safeLog } from "@/lib/security/safe-log";
 import { fetchVendorAccountUUID, ServiceM8ApiError } from "@/lib/servicem8/client";
@@ -37,15 +36,6 @@ export async function GET(request: Request) {
     const tokens = await exchangeAuthorizationCode(code);
     stage = "vendor_identity";
     const accountUUID = await fetchVendorAccountUUID(tokens.accessToken);
-    if (accountUUID !== getConfig().allowedAccountUUID) {
-      safeLog("warn", "Rejected unapproved ServiceM8 OAuth account", {
-        account: redactIdentifier(accountUUID),
-      });
-      return new Response(
-        renderError("Connection rejected", "This ServiceM8 account is not authorised for this assistant."),
-        { status: 403, headers },
-      );
-    }
     stage = "connection_save";
     await saveOAuthConnection(accountUUID, tokens);
     stage = "admin_session";

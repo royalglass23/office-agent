@@ -5,10 +5,10 @@ import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/
 import { loadPhaseZeroJobContext } from "@/lib/servicem8/job-context";
 import {
   renderError,
-  renderConversationAssistant,
   renderJobContext,
   renderLaunchProof,
   renderMenuAssistant,
+  renderProofAssistant,
 } from "@/lib/servicem8/render-context-html";
 import { EventVerificationError, verifyServiceM8Event } from "@/lib/servicem8/verify-event";
 import { consumeEventHash } from "@/lib/storage/consumed-events";
@@ -32,13 +32,6 @@ export async function POST(request: Request) {
   try {
     const config = getConfig();
     const verified = await verifyServiceM8Event(await request.text(), config.serviceM8AppSecret);
-    if (verified.event.auth.accountUUID !== config.allowedAccountUUID) {
-      safeLog("warn", "Rejected unapproved ServiceM8 account", {
-        requestId,
-        account: redactIdentifier(verified.event.auth.accountUUID),
-      });
-      return addonResponse(renderError("Launch rejected", "This ServiceM8 account is not authorised."), 403);
-    }
     const replayExpiry = verified.event.exp
       ? new Date(verified.event.exp * 1000)
       : new Date(Date.now() + 10 * 60 * 1000);
@@ -68,7 +61,7 @@ export async function POST(request: Request) {
       safeLog("info", "Completed named global menu launch", identifiers);
       if (config.assistantProof.enabled) {
         const session = await issueAssistantSession(verified.event.auth, config.sessionSigningSecret);
-        return addonResponse(renderConversationAssistant(
+        return addonResponse(renderProofAssistant(
           staff.first,
           new URL("/assistant", config.appBaseUrl),
           session,

@@ -6,7 +6,6 @@ const {
   fetchVendorAccountUUID,
   saveOAuthConnection,
   createAdminSession,
-  getConfig,
   safeLog,
   ServiceM8ApiError,
 } = vi.hoisted(() => ({
@@ -15,7 +14,6 @@ const {
   fetchVendorAccountUUID: vi.fn(),
   saveOAuthConnection: vi.fn(),
   createAdminSession: vi.fn(),
-  getConfig: vi.fn(),
   safeLog: vi.fn(),
   ServiceM8ApiError: class ServiceM8ApiError extends Error {
     constructor(
@@ -30,7 +28,6 @@ const {
 }));
 
 vi.mock("@/lib/storage/oauth-state", () => ({ consumeOAuthState }));
-vi.mock("@/lib/config", () => ({ getConfig }));
 vi.mock("@/lib/servicem8/oauth", () => ({ exchangeAuthorizationCode }));
 vi.mock("@/lib/servicem8/client", () => ({ fetchVendorAccountUUID, ServiceM8ApiError }));
 vi.mock("@/lib/storage/oauth-connections", () => ({ saveOAuthConnection }));
@@ -67,7 +64,6 @@ describe("ServiceM8 OAuth callback diagnostics", () => {
     fetchVendorAccountUUID.mockResolvedValue(accountUUID);
     saveOAuthConnection.mockResolvedValue(undefined);
     createAdminSession.mockResolvedValue("private-session-token");
-    getConfig.mockReturnValue({ allowedAccountUUID: accountUUID });
   });
 
   it.each([
@@ -112,17 +108,6 @@ describe("ServiceM8 OAuth callback diagnostics", () => {
     expect(response.headers.get("set-cookie")).toBe("rg_oauth_admin=private-session-token");
     expect(await response.text()).toContain("RG Office Assistant connected");
     expect(safeLog).toHaveBeenCalledWith("info", "Bound ServiceM8 OAuth connection", { account: "redacted" });
-  });
-
-  it("rejects a foreign Vendor account before persistence or session issuance", async () => {
-    fetchVendorAccountUUID.mockResolvedValueOnce("123e4567-cb72-4d94-8a1e-d454131257eb");
-
-    const response = await GET(callbackRequest());
-
-    expect(response.status).toBe(403);
-    expect(saveOAuthConnection).not.toHaveBeenCalled();
-    expect(createAdminSession).not.toHaveBeenCalled();
-    expect(await response.text()).toContain("not authorised");
   });
 
   it("logs only a safe Vendor failure category and HTTP status", async () => {

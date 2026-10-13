@@ -81,12 +81,4 @@ describe("staff-bound assistant session", () => {
     expect(search.hashes).not.toEqual(summary.hashes);
     expect(search.retryAfterSeconds).toBe(30);
   });
-
-  it("caps all assistant requests before intent-specific work", () => {
-    const request = assistantRateLimit(identity, "request", new Date("2030-01-01T00:00:30Z"));
-
-    expect(request.hashes).toHaveLength(20);
-    expect(new Set(request.hashes).size).toBe(20);
-    expect(request.retryAfterSeconds).toBe(30);
-  });
 });

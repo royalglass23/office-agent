@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { uuidSchema } from "./servicem8/event-schema";
 
 const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes", "read_staff"] as const;
 
@@ -9,7 +8,6 @@ const envSchema = z.object({
   SERVICEM8_APP_SECRET: z.string().min(16),
   SERVICEM8_OAUTH_REDIRECT_URI: z.url().refine((url) => url.startsWith("https://"), "must use HTTPS"),
   SERVICEM8_OAUTH_SCOPES: z.string().min(1),
-  SERVICEM8_ALLOWED_ACCOUNT_UUID: uuidSchema,
   DATABASE_URL: z.string().min(1),
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   SESSION_SIGNING_SECRET: z.string().min(32),
@@ -25,7 +23,6 @@ export type PhaseZeroConfig = {
   serviceM8AppSecret: string;
   oauthRedirectUri: URL;
   oauthScopes: string;
-  allowedAccountUUID: string;
   databaseUrl: string;
   tokenEncryptionKey: string;
   sessionSigningSecret: string;
@@ -73,7 +70,6 @@ export function getConfig(): PhaseZeroConfig {
     serviceM8AppSecret: env.SERVICEM8_APP_SECRET,
     oauthRedirectUri,
     oauthScopes: [...requiredScopes].join(" "),
-    allowedAccountUUID: env.SERVICEM8_ALLOWED_ACCOUNT_UUID,
     databaseUrl: databaseUrl.toString(),
     tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY,
     sessionSigningSecret: env.SESSION_SIGNING_SECRET,

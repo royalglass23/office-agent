@@ -24,17 +24,16 @@ Office Assistant sign-in is required for the initial global flow.
 ## Consequences
 
 - The user must identify a Job after opening the assistant globally.
-- Staff may eventually describe the Job naturally by address or provide its Job number. The first
-  Phase 1 slice requires one exact Job number; address search remains deferred until its known scan
-  failure is fixed and accepted.
+- Staff may describe the Job naturally by address or provide its Job number. Address is the normal
+  reference; Job number is also supported.
 - A single authorised match may become the Selected Job directly. Multiple matches must be shown
   for explicit staff selection; the assistant must not guess from similar addresses or customers.
 - The first proof is intentionally smaller than the planned first release: find and explicitly
   select a Job, then produce a read-only account of what happened from the Initial Job Context.
 - The provisional Proof Answer is a short plain-English summary followed by a dated evidence
   timeline. This is a testable presentation choice, not a permanent answer format.
-- Review-only Email Drafts are now an accepted capability. Suggested Next Actions remain deferred.
-  The Office Assistant does not send email or mutate ServiceM8.
+- Email Drafts and Suggested Next Actions are deferred until that proof works reliably. The Office
+  Assistant does not send email or mutate ServiceM8.
 - The first release's Initial Job Context is deliberately limited to core Selected Job and customer
   fields plus Job diary notes.
 - Responses must disclose that email, SMS, forms, attachments, and schedule activity are excluded.

@@ -15,7 +15,7 @@ export default function Home() {
           <div>
             <h1 id="page-title">{name}</h1>
             <p className={styles.intro}>
-              Bounded read-only conversation. Launch it globally from the authorised Add-ons menu.
+              Read-only ServiceM8 proof. Launch it globally from the authorised Add-ons menu.
             </p>
           </div>
           <span className={styles.environment}>{name.endsWith("Staging") ? "Staging" : "Production"}</span>
@@ -48,10 +48,6 @@ export default function Home() {
           </div>
           <div>
             <dt>Email Draft proof</dt>
-            <dd>{config.assistantProof.enabled ? "Enabled" : "Disabled"}</dd>
-          </div>
-          <div>
-            <dt>Phase 1 conversation</dt>
             <dd>{config.assistantProof.enabled ? "Enabled" : "Disabled"}</dd>
           </div>
         </dl>

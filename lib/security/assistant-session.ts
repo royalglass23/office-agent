@@ -17,7 +17,6 @@ export type AssistantIdentity = z.infer<typeof identitySchema>;
 export type AssistantSession = AssistantIdentity & { launchExpiresAt: number };
 
 const assistantRateLimits = {
-  request: { maximum: 20, windowSeconds: 60 },
   search: { maximum: 10, windowSeconds: 60 },
   summary: { maximum: 5, windowSeconds: 60 },
   draft: { maximum: 5, windowSeconds: 60 },
@@ -29,7 +28,7 @@ export function assistantSessionHash(token: string) {
 
 export function assistantRateLimit(
   identity: AssistantIdentity,
-  action: "request" | "search" | "summary" | "draft",
+  action: "search" | "summary" | "draft",
   now = new Date(),
 ) {
   const { maximum, windowSeconds } = assistantRateLimits[action];
