@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createOfficeAssistantProof,
+  type ProofEvidence,
   type ProofReader,
 } from "@/lib/servicem8/office-assistant-proof";
 
@@ -124,13 +125,13 @@ describe("bounded Office Assistant proof", () => {
       job: { jobNumber: "R260766", address: "10 Queen Street, Auckland", customerName: "Example Customer" },
       purpose: "Follow up after the site measure",
       draft: {
-        subject: "Follow up after the site measure — R260766",
+        subject: "R260766 – Site measure follow-up",
         body: [
-          "Hi Example Customer,",
+          "Hello,",
           "",
           "I'm writing regarding Job R260766 at 10 Queen Street, Auckland.",
           "",
-          "Site measure completed.",
+          "Could you please follow up after the site measure?",
           "",
           "Kind regards,",
           "Royal Glass",
@@ -150,6 +151,190 @@ describe("bounded Office Assistant proof", () => {
       "Follow up after the site measure",
     );
     expect(proofReader.getJob).toHaveBeenCalledWith(jobOne.uuid);
+  });
+
+  it("writes a concise BC programming request without copying notes or addressing a company as a person", async () => {
+    const proofReader = reader({
+      getCompany: vi.fn(async () => ({ uuid: jobOne.companyUUID, name: "urbanscapes" })),
+      readNotesPage: vi.fn(async () => ({ notes: [{
+        uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33",
+        jobUUID: jobOne.uuid,
+        text: "Date: 14/10/2026. BC has been approved. Called Matt at 021 123 4567. Raw internal note wording.",
+        createdAt: "2026-10-14T00:00:00Z",
+      }], nextCursor: null })),
+    });
+    const proof = createOfficeAssistantProof({
+      reader: proofReader,
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Ask Matt to confirm whether the Job can now be programmed because the BC has been approved.");
+    expect(result.draft.subject).toMatch(/R260766.*programming.*BC/i);
+    expect(result.draft.subject.length).toBeLessThan(80);
+    expect(result.draft.body).toContain("Hello,");
+    expect(result.draft.body).toMatch(/please confirm whether.*programmed/i);
+    expect(result.draft.body).not.toContain("Hi urbanscapes");
+    expect(result.draft.body).not.toContain("Raw internal note wording");
+    expect(result.draft.body).not.toContain("[phone redacted]");
+    expect(result.draft.citations).toContain("note:1");
+    expect(result.coverage.noteCount).toBe(1);
+  });
+
+  it("preserves dates while redacting phone numbers in evidence sent for drafting", async () => {
+    const draft = vi.fn(async (evidence: readonly ProofEvidence[]) => {
+      expect(evidence.length).toBeGreaterThan(0);
+      return { citations: ["note:1"] };
+    });
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [{
+        uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+        text: "Date: 2026-10-14; approved: 14.10.2026. Phone: 021 123 4567.", createdAt: "2026-10-14T00:00:00Z",
+      }], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() }, drafter: { draft },
+    });
+    await proof.draftEmail("R260766", "Request an update");
+    const submitted = draft.mock.calls[0][0].find((item) => item.id === "note:1")?.text;
+    expect(submitted).toContain("2026-10-14");
+    expect(submitted).toContain("14.10.2026");
+    expect(submitted).toContain("[phone redacted]");
+    expect(submitted).not.toContain("021 123 4567");
+  });
+
+  it("asks for BC status when the selected evidence does not confirm approval", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Ask whether the Job can be programmed because BC was approved");
+    expect(result.draft.subject).toContain("Confirm BC status and programming");
+    expect(result.draft.body).toContain("confirm whether BC approval has been received");
+    expect(result.draft.body).not.toContain("following the BC approval");
+    expect(result.draft.citations).toEqual(["job:record", "company:record"]);
+  });
+
+  it("does not claim BC approval when a cited note says approval is pending", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [{
+        uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+        text: "BC has not been approved; approval pending.", createdAt: "2026-10-14T00:00:00Z",
+      }], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Ask Matt to confirm whether the Job can now be programmed because BC has been approved.");
+    expect(result.draft.subject).toContain("Confirm BC status and programming");
+    expect(result.draft.body).toContain("confirm whether BC approval has been received");
+    expect(result.draft.body).not.toContain("following the BC approval");
+  });
+
+  it("does not claim BC approval when selected notes conflict", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [
+        { uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+          text: "BC has been approved.", createdAt: "2026-10-13T00:00:00Z" },
+        { uuid: "cb713735-8707-4c57-adbe-019b549c126b", jobUUID: jobOne.uuid,
+          text: "BC approval pending confirmation.", createdAt: "2026-10-14T00:00:00Z" },
+      ], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1", "note:2"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Ask whether the Job can be programmed because BC was approved");
+    expect(result.draft.subject).toContain("Confirm BC status and programming");
+    expect(result.draft.body).toContain("confirm whether BC approval has been received");
+  });
+
+  it("keeps a date beside a phone number while redacting only the phone number", async () => {
+    const draft = vi.fn(async (evidence: readonly ProofEvidence[]) => {
+      expect(evidence.length).toBeGreaterThan(0);
+      return { citations: ["note:1"] };
+    });
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [{
+        uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+        text: "Date: 14.10.2026 021 123 4567", createdAt: "2026-10-14T00:00:00Z",
+      }], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() }, drafter: { draft },
+    });
+    await proof.draftEmail("R260766", "Request an update");
+    const submitted = draft.mock.calls[0][0].find((item) => item.id === "note:1")?.text;
+    expect(submitted).toContain("Date: 14.10.2026");
+    expect(submitted).toContain("[phone redacted]");
+    expect(submitted).not.toContain("021 123 4567");
+  });
+
+  it("summarises a general request in the subject instead of copying its full purpose", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const purpose = "Ask Matt to confirm the installation date because the glass has arrived.";
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toBe("R260766 – Confirm installation date");
+    expect(result.draft.subject).not.toContain("because the glass has arrived");
+    expect(result.draft.body).toContain("confirm the installation date");
+  });
+
+  it.each([
+    ["Request an update", "R260766 – Update request"],
+    ["Give the customer a progress update", "R260766 – Progress update"],
+  ])("creates a concise subject for %s", async (purpose, expectedSubject) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toBe(expectedSubject);
+  });
+
+  it("uses a short purpose topic when no subject template matches", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const purpose = "Discuss the revised quote with Matt before arranging a call.";
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toBe("R260766 – Regarding revised quote");
+    expect(result.draft.subject).not.toContain("Matt");
+    expect(result.draft.body).toContain("discuss the revised quote with Matt");
+  });
+
+  it("keeps the requested action and topic in an unmatched subject", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const purpose = "Reschedule the site visit with Matt before Friday.";
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toBe("R260766 – Reschedule site visit");
+    expect(result.draft.body).toContain("reschedule the site visit with Matt before Friday");
+  });
+
+  it.each([
+    ["Follow up with Matt about the revised quote.", "R260766 – Revised quote follow-up"],
+    ["Resolve scheduling conflict for next week's install.", "R260766 – Resolve scheduling conflict"],
+  ])("keeps a concise topic for unmatched purpose %s", async (purpose, expectedSubject) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toBe(expectedSubject);
+    expect(result.draft.subject).not.toContain(purpose);
+  });
+
+  it.each([
+    ["Apply for BC approval.", "BC approval"],
+    ["Submit plans for council approval.", "council approval"],
+    ["Discuss plans for council approval with Matt.", "council approval"],
+  ])("retains an essential for-phrase in the subject for %s", async (purpose, topic) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", purpose);
+    expect(result.draft.subject).toContain(topic);
+    expect(result.draft.subject.length).toBeLessThan(80);
   });
 
   it("redacts credentials in the staff purpose before requesting an email draft", async () => {

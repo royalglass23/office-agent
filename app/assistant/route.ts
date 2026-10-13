@@ -22,6 +22,7 @@ import {
   renderConversationDraftPrompt,
   renderConversationGuidance,
   renderConversationProofAnswer,
+  renderConversationAssistant,
   renderProofAnswer,
   renderProofMessage,
 } from "@/lib/servicem8/render-context-html";
@@ -35,7 +36,19 @@ const responseHeaders = {
   "Content-Type": "text/html; charset=utf-8",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
+  "Access-Control-Allow-Origin": "*",
 };
+
+export function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...responseHeaders,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
 
 class AssistantInputError extends Error {}
 
@@ -57,6 +70,13 @@ async function readForm(request: Request) {
     return values[0];
   };
   const session = singleton("session", 4_096);
+  const restartValues = form.getAll("restart");
+  if (restartValues.length > 0) {
+    if (restartValues.length !== 1 || restartValues[0] !== "1" || form.size !== 2) {
+      throw new AssistantInputError("Invalid restart request");
+    }
+    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, emailPurpose: undefined };
+  }
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
   const purposeValues = form.getAll("emailPurpose");
@@ -120,6 +140,11 @@ export async function POST(request: Request) {
       new Date(Date.now() + 31 * 60 * 1000),
     ))) {
       return html(renderProofMessage("Session already used", "Reopen the Office Assistant from ServiceM8."), 409);
+    }
+
+    if (form.restart) {
+      const nextSession = await issueAssistantSession(identity, config.sessionSigningSecret, new Date(), identity.launchExpiresAt);
+      return html(renderConversationAssistant("there", actionUrl, nextSession));
     }
 
     const conversationIntent = form.message ? parseConversationMessage(form.message) : null;
@@ -206,7 +231,20 @@ export async function POST(request: Request) {
     }
 
     if (requestedJobNumber) {
-      const answer = await proof.answerWhatHappened(requestedJobNumber);
+      let answer;
+      try {
+        answer = await proof.answerWhatHappened(requestedJobNumber);
+      } catch (error) {
+        if (error instanceof ProofResolutionError && conversationIntent?.kind === "history") {
+          return html(renderConversationGuidance(
+            form.message!,
+            `I couldn’t find one clear match for Job ${requestedJobNumber}. Check the Job number and try again.`,
+            actionUrl,
+            nextSession,
+          ));
+        }
+        throw error;
+      }
       safeLog("info", "Completed selected Job history proof", logContext);
       if (conversationIntent?.kind === "history") {
         return html(renderConversationProofAnswer(form.message!, answer, actionUrl, nextSession));

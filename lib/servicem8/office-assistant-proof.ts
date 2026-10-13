@@ -93,7 +93,16 @@ function searchableTokens(value: string) {
 }
 
 function normalizeText(value: string) {
-  return value
+  const dates: string[] = [];
+  const protectedText = value.replace(/\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b/g, (candidate) => {
+    const parts = candidate.split(/[-/.]/).map(Number);
+    const [year, month, day] = parts[0] > 999 ? parts : [parts[2], parts[1], parts[0]];
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month || parsed.getUTCDate() !== day) return candidate;
+    dates.push(candidate);
+    return `\uE000DATE${dates.length - 1}\uE001`;
+  });
+  return protectedText
     .replace(/<[^>]*>/g, " ")
     .replace(/\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[token redacted]")
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "[uuid redacted]")
@@ -104,7 +113,46 @@ function normalizeText(value: string) {
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/gi, "[secret redacted]")
     .replace(/(["']?)(password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret)\1\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;}\]]+)/gi, "$1$2$1=[secret redacted]")
     .replace(/\s+/g, " ")
+    .replace(/\uE000DATE(\d+)\uE001/g, (_marker, index: string) => dates[Number(index)] ?? "")
     .trim();
+}
+
+function emailObjective(purpose: string) {
+  return purpose
+    .replace(/^ask\s+(?:the\s+)?[a-z'-]+\s+to\s+/i, "")
+    .replace(/^(?:please\s+|could you please\s+)/i, "")
+    .replace(/\s+(?:because|since|as)\b.*$/i, "")
+    .replace(/[.!?]+$/, "")
+    .trim();
+}
+
+function emailSubject(jobNumber: string, objective: string) {
+  let topic = objective
+    .replace(/\s+(?:with|before|after)\b.*$/i, "")
+    .replace(/^(\S+)\s+(?:the|an?)\s+/i, "$1 ")
+    .trim();
+  const withoutTiming = topic.replace(/\s+for\s+(?:next|this|last)\s+(?:week|month|year)(?:'s)?\b.*$/i, "");
+  if (withoutTiming.split(/\s+/).length >= 3) topic = withoutTiming;
+  const confirmation = /^confirm\s+(?:whether\s+|if\s+)?(?:the\s+)?(.+)$/i.exec(objective);
+  const followUp = /^follow up after (?:the )?(.+)$/i.exec(objective);
+  const followUpWith = /^follow up with .+?\s+(?:about|regarding|on)\s+(?:the\s+)?(.+)$/i.exec(objective);
+  const request = /^request\s+(?:an?\s+)?(.+)$/i.exec(objective);
+  const customerUpdate = /^(?:give|provide|send)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(.+)$/i.exec(objective);
+  const generalTopic = /^(?:discuss|check|review|clarify|arrange|coordinate)\s+(?:the\s+|an?\s+)?(.+)$/i.exec(objective);
+  if (confirmation) topic = `Confirm ${confirmation[1]}`;
+  else if (followUp) topic = `${followUp[1]} follow-up`;
+  else if (followUpWith) topic = `${followUpWith[1]} follow-up`;
+  else if (request) topic = `${request[1]} request`;
+  else if (customerUpdate) topic = customerUpdate[1];
+  else if (generalTopic) {
+    const detail = generalTopic[1].replace(/\s+(?:with|before|after)\b.*$/i, "").trim();
+    if (detail) topic = `Regarding ${detail}`;
+  }
+  topic = topic.replace(/^./, (letter) => letter.toUpperCase());
+  const clipped = topic.length <= 55
+    ? topic
+    : topic.slice(0, 55).replace(/\s+\S*$/, "").trim() || topic.slice(0, 55);
+  return `${jobNumber} – ${clipped}`;
 }
 
 function normalizeDate(value: string) {
@@ -161,37 +209,32 @@ function buildEmailDraft(
     .filter((citation) => citation.startsWith("note:"))
     .map((citation) => evidence.find((item) => item.id === citation))
     .filter((item): item is ProofEvidence => item !== undefined);
-  const customerName = normalizeText(company.name) || "there";
   const normalizedAddress = normalizeText(job.address);
   const address = normalizedAddress ? ` at ${normalizedAddress}` : "";
+  const programmingRequest = /\bprogram(?:med|ming)?\b/i.test(purpose) && /\bBC\b/i.test(purpose);
+  const approvalUncertain = selectedNotes.some((note) => /\bBC\b.{0,60}\b(?:not|pending|awaiting|unconfirmed|declined|rejected|revoked)\b/i.test(note.text));
+  const approvedInEvidence = !approvalUncertain && selectedNotes.some((note) =>
+    /\bBC\b\s+(?:(?:has\s+been|was|is)\s+)?approved\b(?!\s*\?)/i.test(note.text));
+  const objective = emailObjective(purpose);
+  const subject = programmingRequest
+    ? `${job.jobNumber} – ${approvedInEvidence ? "Confirm programming after BC approval" : "Confirm BC status and programming"}`
+    : emailSubject(job.jobNumber, objective);
+  const request = programmingRequest
+    ? approvedInEvidence
+      ? "Could you please confirm whether this Job can now be programmed following the BC approval?"
+      : "Could you please confirm whether BC approval has been received and whether this Job can now be programmed?"
+    : `Could you please ${objective.replace(/^./, (letter) => letter.toLowerCase())}?`;
   const prefix = [
-    `Hi ${customerName},`,
+    "Hello,",
     "",
     `I'm writing regarding Job ${job.jobNumber}${address}.`,
   ].join("\n") + "\n\n";
   const suffix = "\n\nKind regards,\nRoyal Glass";
-  const availableEvidenceLength = MAX_EMAIL_BODY_LENGTH - prefix.length - suffix.length;
-  const includedNotes: ProofEvidence[] = [];
-  let factualUpdate = "";
-  for (const note of selectedNotes) {
-    const separator = factualUpdate ? "\n\n" : "";
-    const remaining = availableEvidenceLength - factualUpdate.length - separator.length;
-    if (remaining <= 0) break;
-    const text = note.text.slice(0, remaining);
-    factualUpdate += `${separator}${text}`;
-    includedNotes.push(note);
-    if (text.length < note.text.length) break;
-  }
-  if (!factualUpdate) {
-    factualUpdate = `The Job is currently recorded as ${normalizeText(job.status) || "status not supplied"}.`
-      .slice(0, availableEvidenceLength);
-  }
-  const subjectPrefix = purpose.slice(0, Math.max(1, 200 - job.jobNumber.length - 3)).trim();
 
   return {
-    subject: `${subjectPrefix} — ${job.jobNumber}`,
-    body: `${prefix}${factualUpdate}${suffix}`,
-    citations: ["job:record", "company:record", ...includedNotes.map((note) => note.id)],
+    subject,
+    body: `${prefix}${request}${suffix}`.slice(0, MAX_EMAIL_BODY_LENGTH),
+    citations: ["job:record", "company:record", ...selectedNotes.map((note) => note.id)],
   };
 }
 

@@ -24,13 +24,14 @@ describe("renderMenuAssistant", () => {
       "signed-session-token",
     );
     expect(html).toContain('action="https://office.example.test/assistant"');
+    expect(html).toContain("connect-src https://office.example.test");
     expect(html).toContain('name="session" value="signed-session-token"');
     expect(html).toContain('name="query"');
     expect(html).not.toContain("accountUUID");
     expect(html).not.toContain("staffUUID");
   });
 
-  it("prevents a second proof submission while the first request is in flight", () => {
+  it("submits without a browser POST history entry and blocks a second submission", async () => {
     const html = renderProofAssistant(
       "May",
       new URL("https://office.example.test/assistant"),
@@ -39,23 +40,54 @@ describe("renderMenuAssistant", () => {
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
     expect(script).toBeDefined();
 
-    let submitHandler: ((event: { preventDefault: () => void }) => void) | undefined;
-    const button = { disabled: false, textContent: "What happened?" };
-    const form = {
-      addEventListener: (_type: string, handler: typeof submitHandler) => { submitHandler = handler; },
-      querySelectorAll: () => [button],
-    };
-    const document = { querySelectorAll: () => [form] };
-    runInNewContext(script!, { document });
+    let submitHandler: ((event: { target: unknown; preventDefault: () => void }) => Promise<void>) | undefined;
+    const button = { disabled: false, textContent: "What happened?", dataset: { pendingLabel: "Checking…" } };
+    class HTMLFormElement {
+      action = "https://office.example.test/assistant";
+      method = "post";
+      dataset = { submitted: "false" };
+      querySelectorAll() { return [button]; }
+    }
+    const form = new HTMLFormElement();
+    const document = { addEventListener: (_type: string, handler: typeof submitHandler) => { submitHandler = handler; }, documentElement: { innerHTML: "" } };
+    const fetcher = vi.fn(async () => ({ text: async () => "<html>Next conversation</html>" }));
+    const DOMParser = class { parseFromString() { return { documentElement: { innerHTML: "<head></head><body>Next conversation</body>" } }; } };
+    runInNewContext(script!, { document, fetch: fetcher, FormData: class { constructor() {} }, URL, URLSearchParams, DOMParser, HTMLFormElement, location: { origin: "https://office.example.test" } });
 
-    const firstSubmission = { preventDefault: vi.fn() };
-    submitHandler!(firstSubmission);
-    expect(firstSubmission.preventDefault).not.toHaveBeenCalled();
-    expect(button).toEqual({ disabled: true, textContent: "Checking…" });
+    const firstSubmission = { target: form, preventDefault: vi.fn() };
+    const pending = submitHandler!(firstSubmission);
+    expect(firstSubmission.preventDefault).toHaveBeenCalledOnce();
+    expect(button).toMatchObject({ disabled: true, textContent: "Checking…" });
 
-    const secondSubmission = { preventDefault: vi.fn() };
+    const secondSubmission = { target: form, preventDefault: vi.fn() };
     submitHandler!(secondSubmission);
     expect(secondSubmission.preventDefault).toHaveBeenCalledOnce();
+    await pending;
+    expect(fetcher).toHaveBeenCalledWith("https://office.example.test/assistant", expect.objectContaining({ method: "POST" }));
+    expect(document.documentElement.innerHTML).toContain("Next conversation");
+  });
+
+  it("submits the first ServiceM8 iframe form without leaving a POST history entry", async () => {
+    const html = renderProofAssistant("May", new URL("https://office.example.test/assistant"), "signed-session-token");
+    const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
+    let handler: ((event: { target: unknown; preventDefault: () => void }) => Promise<void>) | undefined;
+    class HTMLFormElement {
+      action = "https://office.example.test/assistant";
+      method = "post";
+      dataset = { submitted: "false" };
+      querySelectorAll() { return [{ disabled: false, textContent: "Send", dataset: {} }]; }
+    }
+    const fetcher = vi.fn(async () => ({ text: async () => "<html>Next conversation</html>" }));
+    runInNewContext(script!, {
+      document: { addEventListener: (_type: string, callback: typeof handler) => { handler = callback; }, documentElement: { innerHTML: "" } },
+      HTMLFormElement, URL, URLSearchParams, FormData: class { constructor() {} },
+      DOMParser: class { parseFromString() { return { documentElement: { innerHTML: "<body>Next conversation</body>" } }; } },
+      location: { origin: "https://app.servicem8.com" }, fetch: fetcher,
+    });
+    const event = { target: new HTMLFormElement(), preventDefault: vi.fn() };
+    await handler!(event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledWith("https://office.example.test/assistant", expect.objectContaining({ method: "POST", credentials: "omit" }));
   });
 });
 

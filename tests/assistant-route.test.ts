@@ -74,8 +74,8 @@ vi.mock("@/lib/openai/proof-summarizer", () => ({
   createOpenAIProofSummarizer: () => ({ summarize: vi.fn() }),
 }));
 
-import { POST } from "@/app/assistant/route";
-import { ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
+import { OPTIONS, POST } from "@/app/assistant/route";
+import { ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -313,6 +313,59 @@ describe("assistant proof route", () => {
     expect(body).toContain("What happened to R260766?");
     expect(body).toContain("The site measure was completed.");
     expect(body).toContain('name="message"');
+  });
+
+  it("keeps an unknown Job inside the conversation without exposing Job evidence", async () => {
+    proof.answerWhatHappened.mockRejectedValueOnce(new ProofResolutionError());
+    const response = await POST(request({ session: "valid-session", message: "What happened to R000000?" }));
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain("R000000");
+    expect(body).toContain("couldn’t find");
+    expect(body).toContain('name="message"');
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(body).not.toContain("selected Job could not be resolved uniquely");
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("starts a fresh, staff-bound conversation without reading a Job", async () => {
+    const response = await POST(request({ session: "valid-session", restart: "1" }));
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain("what can I help with?");
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(issueAssistantSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
+        staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
+      }),
+      "session-secret-with-at-least-thirty-two-bytes",
+      expect.any(Date),
+      undefined,
+    );
+  });
+
+  it("allows a credential-free ServiceM8 iframe to read its signed POST response", async () => {
+    const response = await POST(new Request("https://office.example.test/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://app.servicem8.com" },
+      body: new URLSearchParams({ session: "valid-session", message: "Help me with R260766" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(response.headers.get("location")).toBeNull();
+    expect(await response.text()).toContain('name="message"');
+  });
+
+  it("permits only form POST preflight without allowing browser credentials", () => {
+    const response = OPTIONS();
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBe("POST, OPTIONS");
+    expect(response.headers.get("access-control-allow-headers")).toBe("Content-Type");
+    expect(response.headers.get("access-control-allow-credentials")).toBeNull();
   });
 
   it("asks for the purpose before drafting an email from a conversational request", async () => {
