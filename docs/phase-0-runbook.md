@@ -126,7 +126,26 @@ must continue to disclose excluded sources. OpenAI selects only authorised evide
 outcome; server code constructs the displayed subject and body from the normalised staff purpose
 and selected-Job data, so model-authored claims are never displayed.
 
-This is local implementation evidence only. Before a production proof:
+## Phase 0 gate record — 13 October 2026
+
+```text
+Gate ID: PHASE-0-TO-PHASE-1
+Current stage: Phase 0
+Candidate next stage: Phase 1 global Add-ons-menu assistant
+Required evidence: Independent Michael and Carla live sessions; correct staff/session separation;
+  bounded What happened and review-only Email Draft results; no ServiceM8 write or outbound action;
+  no mandatory-stop condition triggered.
+Evidence obtained: The owner confirmed the live Michael and Carla checks passed on 13 October 2026.
+  The previously accepted What happened checks and the Email Draft acceptance checks completed
+  successfully within the documented exact-Job-number boundary.
+Unresolved findings: Natural-language address search remains deferred and must not be represented
+  as accepted. No Phase 0 gate blocker remains.
+Gate result: PASS
+User authorised transition: NO
+Authorisation reference: Awaiting an explicit instruction to start Phase 1.
+```
+
+For a future deployment or repeat of this production proof:
 
 1. verify and record the configured OpenAI API organisation's retention/data-control settings;
 2. configure the exact `OPENAI_MODEL` and record it with the test evidence;
