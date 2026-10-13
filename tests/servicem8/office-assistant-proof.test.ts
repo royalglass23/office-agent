@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  APPROVED_PROOF_JOB_NUMBERS,
   createOfficeAssistantProof,
   type ProofReader,
 } from "@/lib/servicem8/office-assistant-proof";
@@ -23,6 +22,7 @@ function reader(overrides: Partial<ProofReader> = {}): ProofReader {
       { ...jobOne, uuid: "8af9e876-4d24-4db1-8c38-e984874872e8", jobNumber: "NOT-APPROVED" },
       { ...jobOne, uuid: "b96f6cde-f9ff-452c-bb0d-e3e81f93cb8e", jobNumber: "R260680", address: "10 Queen Road" },
     ]),
+    listJobsPage: vi.fn(async () => ({ jobs: [jobOne], nextCursor: null })),
     getJob: vi.fn(async () => jobOne),
     getCompany: vi.fn(async () => ({ uuid: jobOne.companyUUID, name: "Example Customer" })),
     readNotesPage: vi.fn(async () => ({
@@ -39,27 +39,73 @@ function reader(overrides: Partial<ProofReader> = {}): ProofReader {
 }
 
 describe("bounded Office Assistant proof", () => {
-  it("searches natural address text only across the five approved Job numbers", async () => {
+  it("searches natural address text across cursor-paginated Jobs", async () => {
+    const nextCursor = "95369538-e550-47ee-9f25-fc8945d0e6de";
+    const selectedJob = {
+      ...jobOne,
+      uuid: "8af9e876-4d24-4db1-8c38-e984874872e8",
+      jobNumber: "R999999",
+      address: "99 New Street, Auckland",
+    };
+    const listJobsPage = vi.fn(async (cursor: string | null) => cursor === null
+      ? { jobs: [jobOne], nextCursor }
+      : { jobs: [selectedJob], nextCursor: null });
+    const proofReader = Object.assign(reader(), { listJobsPage });
+    const proof = createOfficeAssistantProof({ reader: proofReader, summarizer: { summarize: vi.fn() } });
+
+    await expect(proof.searchJobs("99 new street")).resolves.toEqual([
+      expect.objectContaining({ jobNumber: "R999999", address: "99 New Street, Auckland" }),
+    ]);
+    expect(listJobsPage).toHaveBeenNthCalledWith(1, null);
+    expect(listJobsPage).toHaveBeenNthCalledWith(2, nextCursor);
+  });
+
+  it("uses one exact filtered lookup for a Job-number search", async () => {
     const proofReader = reader();
     const proof = createOfficeAssistantProof({ reader: proofReader, summarizer: { summarize: vi.fn() } });
 
-    await expect(proof.searchJobs("10 queen")).resolves.toEqual([
-      expect.objectContaining({ jobNumber: "R260766" }),
+    await expect(proof.searchJobs("r260680")).resolves.toEqual([
       expect.objectContaining({ jobNumber: "R260680" }),
     ]);
-    expect(proofReader.listJobsByNumber).toHaveBeenCalledWith(APPROVED_PROOF_JOB_NUMBERS);
+    expect(proofReader.listJobsByNumber).toHaveBeenCalledWith(["R260680"]);
+    expect(proofReader.listJobsPage).not.toHaveBeenCalled();
   });
 
-  it("rejects a Job outside the allowlist before reading ServiceM8 or calling OpenAI", async () => {
-    const proofReader = reader();
-    const summarize = vi.fn();
+  it("asks for a more specific reference instead of returning an unbounded match list", async () => {
+    const jobs = Array.from({ length: 21 }, (_, index) => ({
+      ...jobOne,
+      jobNumber: `R${String(300000 + index)}`,
+      address: `${index + 1} Example Road, Auckland`,
+    }));
+    const proof = createOfficeAssistantProof({
+      reader: reader({ listJobsPage: vi.fn(async () => ({ jobs, nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+    });
+
+    await expect(proof.searchJobs("Auckland")).rejects.toThrow("more specific Job reference");
+  });
+
+  it("answers for a selected Job outside the former five-Job allowlist", async () => {
+    const selectedJob = {
+      ...jobOne,
+      uuid: "8af9e876-4d24-4db1-8c38-e984874872e8",
+      jobNumber: "R999999",
+      address: "99 New Street, Auckland",
+    };
+    const proofReader = reader({
+      listJobsByNumber: vi.fn(async () => [selectedJob]),
+      getJob: vi.fn(async () => selectedJob),
+      readNotesPage: vi.fn(async () => ({ notes: [], nextCursor: null })),
+    });
+    const summarize = vi.fn(async () => ({ summary: { citations: ["job:record"] } }));
     const proof = createOfficeAssistantProof({ reader: proofReader, summarizer: { summarize } });
 
-    await expect(proof.answerWhatHappened("R999999")).rejects.toThrow("Job is not approved for this proof");
-    expect(proofReader.getJob).not.toHaveBeenCalled();
-    expect(proofReader.getCompany).not.toHaveBeenCalled();
-    expect(proofReader.readNotesPage).not.toHaveBeenCalled();
-    expect(summarize).not.toHaveBeenCalled();
+    await expect(proof.answerWhatHappened("R999999")).resolves.toMatchObject({
+      job: { jobNumber: "R999999", address: "99 New Street, Auckland" },
+    });
+    expect(proofReader.getJob).toHaveBeenCalledWith(selectedJob.uuid);
+    expect(proofReader.getCompany).toHaveBeenCalledWith(selectedJob.companyUUID);
+    expect(summarize).toHaveBeenCalledOnce();
   });
 
   it("reauthorises the selected parent Job before reading customer and notes", async () => {

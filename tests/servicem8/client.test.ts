@@ -74,6 +74,27 @@ describe("ServiceM8Client", () => {
     expect(urls.every((url) => url.searchParams.get("cursor") === "-1")).toBe(true);
   });
 
+  it("reads one staff-scoped Job page and preserves the server cursor", async () => {
+    const nextCursor = "123e4567-cb72-4d94-8a1e-d454131257eb";
+    const fetcher = vi.fn(async () => Response.json([{ uuid: jobUUID }], {
+      headers: { "x-next-cursor": nextCursor },
+    })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+
+    await expect(client.listJobsPage(null)).resolves.toEqual({
+      records: [{ uuid: jobUUID }],
+      nextCursor,
+    });
+    const [url, init] = (fetcher as ReturnType<typeof vi.fn>).mock.calls[0] as [URL, RequestInit];
+    expect(url.pathname).toBe("/api_1.0/job.json");
+    expect(url.searchParams.get("cursor")).toBe("-1");
+    expect(new Headers(init.headers).get("x-impersonate-uuid")).toBe(staffUUID);
+  });
+
   it("reads one filtered Job-note page and returns only the server cursor", async () => {
     const nextCursor = "123e4567-cb72-4d94-8a1e-d454131257eb";
     const fetcher = vi.fn(async () => Response.json([{ uuid: jobUUID }], {

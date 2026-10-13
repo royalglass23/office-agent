@@ -45,7 +45,9 @@ export function renderMenuAssistant(staffFirstName: string) {
   return document(body, styles, script);
 }
 
-const proofStyles = `.assistant-shell{max-width:780px;margin:0 auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#53657d;margin:0 0 6px}.search{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.search-row{display:flex;gap:10px;align-items:end}label{display:block;font-weight:650;margin-bottom:7px}.field{flex:1}input[type=text]{box-sizing:border-box;width:100%;border:1px solid #9baaba;border-radius:8px;padding:11px;font:inherit}button{border:0;border-radius:8px;padding:11px 18px;background:#175cd3;color:#fff;font:inherit;font-weight:650;cursor:pointer}.match{display:block;width:100%;margin:10px 0;padding:14px;text-align:left;background:#fff;color:#182230;border:1px solid #b8c2ce}.match strong,.match span{display:block}.summary{font-size:17px;line-height:1.55}.timeline{padding-left:22px}.timeline li{margin:0 0 16px}.sources,.coverage,.privacy{font-size:13px;color:#53657d}.coverage{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}@media(max-width:560px){.search-row{align-items:stretch;flex-direction:column}}`;
+const proofStyles = `.assistant-shell{max-width:780px;margin:0 auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#53657d;margin:0 0 6px}.search{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.search-row{display:flex;gap:10px;align-items:end}label{display:block;font-weight:650;margin-bottom:7px}.field{flex:1}input[type=text]{box-sizing:border-box;width:100%;border:1px solid #9baaba;border-radius:8px;padding:11px;font:inherit}button{border:0;border-radius:8px;padding:11px 18px;background:#175cd3;color:#fff;font:inherit;font-weight:650;cursor:pointer}button:disabled{cursor:wait;opacity:.7}.match{display:block;width:100%;margin:10px 0;padding:14px;text-align:left;background:#fff;color:#182230;border:1px solid #b8c2ce}.match strong,.match span{display:block}.summary{font-size:17px;line-height:1.55}.timeline{padding-left:22px}.timeline li{margin:0 0 16px}.sources,.coverage,.privacy{font-size:13px;color:#53657d}.coverage{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}@media(max-width:560px){.search-row{align-items:stretch;flex-direction:column}}`;
+
+const proofSubmitOnceScript = `document.querySelectorAll('form[method="post"]').forEach(function(form){let submitted=false;form.addEventListener("submit",function(event){if(submitted){event.preventDefault();return;}submitted=true;form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=true;button.textContent="Checking…";});});});`;
 
 function hiddenSession(sessionToken: string) {
   return `<input type="hidden" name="session" value="${escapeHtml(sessionToken)}">`;
@@ -54,21 +56,21 @@ function hiddenSession(sessionToken: string) {
 function searchForm(actionUrl: URL, sessionToken: string) {
   return `<form class="search" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}
 <div class="search-row"><div class="field"><label for="query">Job address or Job number</label><input id="query" name="query" type="text" maxlength="200" required placeholder="e.g. R260766 or 10 Queen Street"></div><button type="submit">What happened?</button></div>
-<p class="privacy">Read-only proof. Searches only the five approved test Job cards.</p></form>`;
+<p class="privacy">Read-only proof. Search the connected ServiceM8 account by address or Job number.</p></form>`;
 }
 
 export function renderProofAssistant(staffFirstName: string, actionUrl: URL, sessionToken: string) {
   return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Hi, ${escapeHtml(staffFirstName)}—what Job should I check?</h1>
-<p>Enter an address or Job number. If several approved Jobs match, you will choose one before any summary is created.</p>
-${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, "", actionUrl.origin);
+<p>Enter an address or Job number. If several Jobs match, you will choose one before any summary is created.</p>
+${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 type JobMatch = { jobNumber: string; address: string; status: string };
 
 export function renderJobMatches(matches: readonly JobMatch[], actionUrl: URL, sessionToken: string) {
   const choices = matches.map((match) => `<form method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}
-<button class="match" type="submit" name="jobNumber" value="${escapeHtml(match.jobNumber)}"><strong>${escapeHtml(match.jobNumber)}</strong><span>${escapeHtml(match.address || "Address not supplied")}</span><span>${escapeHtml(match.status || "Status not supplied")}</span></button></form>`).join("");
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Choose the Job</h1><p>More than one approved Job matched. Select the intended Job; the assistant will not guess.</p>${choices}<hr>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, "", actionUrl.origin);
+<input type="hidden" name="jobNumber" value="${escapeHtml(match.jobNumber)}"><button class="match" type="submit"><strong>${escapeHtml(match.jobNumber)}</strong><span>${escapeHtml(match.address || "Address not supplied")}</span><span>${escapeHtml(match.status || "Status not supplied")}</span></button></form>`).join("");
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Choose the Job</h1><p>More than one Job matched. Select the intended Job; the assistant will not guess.</p>${choices}<hr>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 export function renderProofMessage(
@@ -77,9 +79,9 @@ export function renderProofMessage(
   actionUrl?: URL,
   sessionToken?: string,
 ) {
-  const retry = actionUrl && sessionToken ? `<h2>Try another approved Job</h2>${searchForm(actionUrl, sessionToken)}` : "";
+  const retry = actionUrl && sessionToken ? `<h2>Try another Job</h2>${searchForm(actionUrl, sessionToken)}` : "";
   const formOrigin = actionUrl?.origin ?? "'none'";
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>${escapeHtml(title)}</h1><p class="notice error">${escapeHtml(message)}</p>${retry}</main>`, proofStyles, "", formOrigin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>${escapeHtml(title)}</h1><p class="notice error">${escapeHtml(message)}</p>${retry}</main>`, proofStyles, proofSubmitOnceScript, formOrigin);
 }
 
 type RenderableProofAnswer = {
@@ -109,7 +111,7 @@ export function renderProofAnswer(answer: RenderableProofAnswer, actionUrl: URL,
 <h2>Summary</h2><p class="summary">${escapeHtml(answer.summary.text)}</p>${citations(answer.summary.citations)}
 <h2>Evidence timeline</h2>${timeline}
 <p class="coverage"><strong>Coverage:</strong> ${escapeHtml(answer.coverage.included.join(" and "))}. Not checked: ${escapeHtml(answer.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>
-<h2>Check another approved Job</h2>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, "", actionUrl.origin);
+<h2>Check another Job</h2>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 export function renderJobContext(event: ServiceM8JobEvent, context: PhaseZeroJobContext) {

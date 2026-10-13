@@ -1,11 +1,12 @@
 # RG Office Assistant
 
 Read-only ServiceM8 Office Assistant proof. A fresh, one-time global Add-ons-menu launch binds a
-short-lived server session to the signed staff identity. Staff can search only the five approved
-test Job cards by address or Job number and ask “What happened?”. The answer uses bounded core
-Job/customer fields and Job notes. OpenAI selects up to three authorised evidence references; the
-server builds the visible summary and dated evidence timeline directly from those records. Email,
-SMS, forms, attachments, schedule activity, writes, and outbound messages remain excluded.
+short-lived server session to the signed staff identity. Staff can search the connected ServiceM8
+account by address or Job number and ask “What happened?”. The answer uses bounded core Job/customer
+fields and Job notes from the staff-selected Job. OpenAI selects up to three authorised evidence
+references; the server builds the visible summary and dated evidence timeline directly from those
+records. Email, SMS, forms, attachments, schedule activity, writes, and outbound messages remain
+excluded.
 
 ## Local checks
 

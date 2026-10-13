@@ -50,6 +50,11 @@ export class ServiceM8ProofReader implements ProofReader {
     return (await this.client.listJobsByNumber(jobNumbers)).map(mapJob);
   }
 
+  async listJobsPage(cursor: string | null) {
+    const page = await this.client.listJobsPage(cursor);
+    return { jobs: page.records.map(mapJob), nextCursor: page.nextCursor };
+  }
+
   async getJob(jobUUID: string) {
     return mapJob(await this.client.getJob(jobUUID));
   }

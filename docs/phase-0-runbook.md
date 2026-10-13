@@ -83,12 +83,11 @@ Phase 1 source is enabled, confirm independent Michael and Carla global sessions
 binding on every request, and fail-closed behavior for invalid, expired, replayed, or cross-account
 launches.
 
-The owner will supply the exact production test Job cards for the first proof. Treat that list as
-an allowlist for testing: do not browse, sample, or read any unrelated production Job. Before note
-text is sent to an AI provider, separately confirm that the supplied content is safe for that use
-and that the provider/privacy gate has been satisfied.
+The owner initially supplied the following production Job cards as the acceptance-test set. They
+remain the repeatable Michael/Carla test set, but they are no longer an application access
+allowlist.
 
-Approved production test Job references supplied on 13 October 2026:
+Production acceptance-test Job references supplied on 13 October 2026:
 
 - `R260766`
 - `R260680`
@@ -96,26 +95,22 @@ Approved production test Job references supplied on 13 October 2026:
 - `R260270`
 - `R260208`
 
-This list authorises only the bounded read-only proof. It does not authorise ServiceM8 writes,
-outbound messages, or sending the records to an AI provider without the separate confirmation
-above.
-
-The owner confirmed on 13 October 2026 that the customer fields and diary-note text for all five
-allowlisted Job cards are safe to send to OpenAI's API for this proof. This consent is limited to
-these Job references and this read-only “What happened?” workflow; it does not extend to other
-Jobs, new data sources, providers, write actions, or future features. The specific OpenAI model is
-deployment configuration and must be recorded with the test evidence.
+The owner confirmed on 13 October 2026 that the five-Job access restriction should be removed. The
+application may search account-wide Jobs and send bounded core/customer fields and diary-note text
+from the staff-selected Job to OpenAI only for the read-only “What happened?” workflow. This does
+not authorise new data sources, providers, write actions, outbound actions, or future features. The
+specific OpenAI model is deployment configuration and must be recorded with the test evidence.
 
 ## Bounded “What happened?” implementation candidate
 
 The local candidate now implements the ADR-0001/ADR-0002 proof behind
 `ASSISTANT_PROOF_ENABLED=false` by default. It uses a fresh global-menu launch to mint a signed,
 30-minute staff-bound session; each submitted form token is one-time, and database-backed search
-and summary buckets rate-limit repeated work. It reads only the allowlisted Job numbers, repeats the
-parent Job read before customer/Note access, sends the signed staff UUID on every ServiceM8 read,
-and requests a non-stored strict JSON-schema response from the configured OpenAI model. The model
-returns only up to three authorised evidence IDs; server code constructs all displayed summary and
-timeline text from the corresponding normalised ServiceM8 evidence.
+and summary buckets rate-limit repeated work. It searches Jobs under the signed staff identity,
+repeats the selected parent Job read before customer/Note access, sends the signed staff UUID on
+every ServiceM8 read, and requests a non-stored strict JSON-schema response from the configured
+OpenAI model. The model returns only up to three authorised evidence IDs; server code constructs
+all displayed summary and timeline text from the corresponding normalised ServiceM8 evidence.
 
 This is local implementation evidence only. Before a production proof:
 
@@ -131,6 +126,7 @@ This is local implementation evidence only. Before a production proof:
 ## Mandatory stop
 
 Report **NO-GO** and do not start Phase 1 if callback freshness is unavailable or untrustworthy,
-account binding differs, Staff B sees any restricted Job data, a child endpoint leaks data, OAuth
-refresh/revocation does not fail closed, the modal requires weakened browser security, or any API
-key, administrator-token fallback, write scope, or ServiceM8 mutation is required.
+account binding differs, an invalid/replayed/cross-account launch sees any Job data, a child
+endpoint leaks data, OAuth refresh/revocation does not fail closed, the modal requires weakened
+browser security, or any ServiceM8 API-key or administrator-token fallback, write scope, or
+ServiceM8 mutation is required.

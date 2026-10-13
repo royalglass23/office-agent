@@ -55,8 +55,8 @@ vi.mock("@/lib/servicem8/proof-reader", () => ({
 }));
 vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
   createOfficeAssistantProof,
-  ProofAuthorizationError: class ProofAuthorizationError extends Error {},
   ProofResolutionError: class ProofResolutionError extends Error {},
+  ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
 }));
 vi.mock("@/lib/openai/proof-summarizer", () => ({
   OpenAIProofError: class OpenAIProofError extends Error {},
@@ -64,6 +64,7 @@ vi.mock("@/lib/openai/proof-summarizer", () => ({
 }));
 
 import { POST } from "@/app/assistant/route";
+import { ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -100,7 +101,7 @@ describe("assistant proof route", () => {
     expect(clientConstructor).not.toHaveBeenCalled();
   });
 
-  it("shows an explicit choice when more than one approved Job matches", async () => {
+  it("shows an explicit choice when more than one Job matches", async () => {
     proof.searchJobs.mockResolvedValueOnce([
       { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
       { jobNumber: "R260680", address: "10 Queen Road", status: "Work Order" },
@@ -116,7 +117,16 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
   });
 
-  it("returns the bounded proof answer for one selected approved Job", async () => {
+  it("asks for a more specific reference when a search has too many matches", async () => {
+    proof.searchJobs.mockRejectedValueOnce(new ProofSearchTooBroadError());
+    const response = await POST(request({ session: "valid-session", query: "Auckland" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("More detail needed");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+  });
+
+  it("returns the bounded proof answer for one selected Job", async () => {
     proof.answerWhatHappened.mockResolvedValueOnce({
       job: { jobNumber: "R260766", address: "10 Queen Street", status: "Work Order", customerName: "Example" },
       summary: { text: "The site measure was completed.", citations: ["note:1"] },

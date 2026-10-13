@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { runInNewContext } from "node:vm";
+import { describe, expect, it, vi } from "vitest";
 import {
   renderJobContext,
   renderJobMatches,
@@ -26,10 +27,38 @@ describe("renderMenuAssistant", () => {
     expect(html).not.toContain("accountUUID");
     expect(html).not.toContain("staffUUID");
   });
+
+  it("prevents a second proof submission while the first request is in flight", () => {
+    const html = renderProofAssistant(
+      "May",
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+    const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
+    expect(script).toBeDefined();
+
+    let submitHandler: ((event: { preventDefault: () => void }) => void) | undefined;
+    const button = { disabled: false, textContent: "What happened?" };
+    const form = {
+      addEventListener: (_type: string, handler: typeof submitHandler) => { submitHandler = handler; },
+      querySelectorAll: () => [button],
+    };
+    const document = { querySelectorAll: () => [form] };
+    runInNewContext(script!, { document });
+
+    const firstSubmission = { preventDefault: vi.fn() };
+    submitHandler!(firstSubmission);
+    expect(firstSubmission.preventDefault).not.toHaveBeenCalled();
+    expect(button).toEqual({ disabled: true, textContent: "Checking…" });
+
+    const secondSubmission = { preventDefault: vi.fn() };
+    submitHandler!(secondSubmission);
+    expect(secondSubmission.preventDefault).toHaveBeenCalledOnce();
+  });
 });
 
 describe("proof result rendering", () => {
-  it("requires explicit selection when several approved Jobs match", () => {
+  it("requires explicit selection when several Jobs match", () => {
     const html = renderJobMatches(
       [
         { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
@@ -39,8 +68,9 @@ describe("proof result rendering", () => {
       "signed-session-token",
     );
     expect(html).toContain("Choose the Job");
-    expect(html).toContain('name="jobNumber" value="R260766"');
-    expect(html).toContain('name="jobNumber" value="R260680"');
+    expect(html).toContain('<input type="hidden" name="jobNumber" value="R260766">');
+    expect(html).toContain('<input type="hidden" name="jobNumber" value="R260680">');
+    expect(html).not.toContain('<button class="match" type="submit" name="jobNumber"');
   });
 
   it("escapes model text and discloses the bounded source coverage", () => {

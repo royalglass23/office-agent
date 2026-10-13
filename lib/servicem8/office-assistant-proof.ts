@@ -1,15 +1,8 @@
 import { z } from "zod";
 import { uuidSchema } from "./event-schema";
 
-export const APPROVED_PROOF_JOB_NUMBERS = [
-  "R260766",
-  "R260680",
-  "R260209",
-  "R260270",
-  "R260208",
-] as const;
-
-const approvedNumbers = new Set<string>(APPROVED_PROOF_JOB_NUMBERS);
+const MAX_JOB_SEARCH_PAGES = 100;
+const MAX_JOB_SEARCH_MATCHES = 20;
 const MAX_NOTES = 200;
 const MAX_NOTE_PAGES = 20;
 const MAX_TEXT_LENGTH = 2_000;
@@ -44,6 +37,7 @@ export type ProofNote = z.infer<typeof noteSchema>;
 
 export type ProofReader = {
   listJobsByNumber(jobNumbers: readonly string[]): Promise<unknown[]>;
+  listJobsPage(cursor: string | null): Promise<{ jobs: unknown[]; nextCursor: string | null }>;
   getJob(jobUUID: string): Promise<unknown>;
   getCompany(companyUUID: string): Promise<unknown>;
   readNotesPage(jobUUID: string, cursor: string | null): Promise<{ notes: unknown[]; nextCursor: string | null }>;
@@ -64,17 +58,17 @@ export type ProofSummarizer = {
   summarize(evidence: readonly ProofEvidence[]): Promise<{ summary: { citations: string[] } }>;
 };
 
-export class ProofAuthorizationError extends Error {
+export class ProofResolutionError extends Error {
   constructor() {
-    super("Job is not approved for this proof");
-    this.name = "ProofAuthorizationError";
+    super("Selected Job could not be resolved uniquely");
+    this.name = "ProofResolutionError";
   }
 }
 
-export class ProofResolutionError extends Error {
+export class ProofSearchTooBroadError extends Error {
   constructor() {
-    super("Approved Job could not be resolved uniquely");
-    this.name = "ProofResolutionError";
+    super("Enter a more specific Job reference");
+    this.name = "ProofSearchTooBroadError";
   }
 }
 
@@ -158,33 +152,48 @@ function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
 }
 
 export function createOfficeAssistantProof({ reader, summarizer, now = () => new Date() }: Dependencies) {
-  async function approvedJobs(jobNumbers: readonly string[]) {
+  async function jobsByNumber(jobNumbers: readonly string[]) {
     const rows = await reader.listJobsByNumber(jobNumbers);
     return rows
       .map((row) => jobSchema.parse(row))
-      .filter((job) => approvedNumbers.has(job.jobNumber) && jobNumbers.includes(job.jobNumber));
+      .filter((job) => jobNumbers.includes(job.jobNumber));
   }
 
   return {
     async searchJobs(query: string) {
       const tokens = searchableTokens(query);
       if (tokens.length === 0) return [];
-      const jobs = await approvedJobs(APPROVED_PROOF_JOB_NUMBERS);
-      return jobs.filter((job) => {
-        const haystack = normalizeSearch(`${job.jobNumber} ${job.address}`);
-        return tokens.every((token) => haystack.includes(token));
-      });
+      const exactJobNumber = query.trim().toUpperCase();
+      if (/^[A-Z]\d{6}$/.test(exactJobNumber)) return jobsByNumber([exactJobNumber]);
+
+      const matches: ProofJob[] = [];
+      const cursors = new Set<string>();
+      let cursor: string | null = null;
+      for (let page = 0; page < MAX_JOB_SEARCH_PAGES; page += 1) {
+        const result = await reader.listJobsPage(cursor);
+        for (const row of result.jobs) {
+          const job = jobSchema.parse(row);
+          const haystack = normalizeSearch(`${job.jobNumber} ${job.address}`);
+          if (tokens.every((token) => haystack.includes(token))) {
+            matches.push(job);
+            if (matches.length > MAX_JOB_SEARCH_MATCHES) throw new ProofSearchTooBroadError();
+          }
+        }
+        if (result.nextCursor === null) return matches;
+        if (cursors.has(result.nextCursor)) throw new Error("Repeated Job page cursor");
+        cursors.add(result.nextCursor);
+        cursor = result.nextCursor;
+      }
+      throw new Error("Job search exceeded the page limit");
     },
 
     async answerWhatHappened(requestedJobNumber: string) {
       const jobNumber = requestedJobNumber.trim().toUpperCase();
-      if (!approvedNumbers.has(jobNumber)) throw new ProofAuthorizationError();
-
-      const matches = await approvedJobs([jobNumber]);
+      const matches = await jobsByNumber([jobNumber]);
       if (matches.length !== 1) throw new ProofResolutionError();
       const listedJob = matches[0];
       const job = jobSchema.parse(await reader.getJob(listedJob.uuid));
-      if (job.uuid !== listedJob.uuid || job.jobNumber !== jobNumber || !approvedNumbers.has(job.jobNumber)) {
+      if (job.uuid !== listedJob.uuid || job.jobNumber !== jobNumber) {
         throw new Error("ServiceM8 returned a different Job");
       }
 

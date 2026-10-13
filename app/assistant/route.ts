@@ -10,8 +10,8 @@ import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-lo
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import {
   createOfficeAssistantProof,
-  ProofAuthorizationError,
   ProofResolutionError,
+  ProofSearchTooBroadError,
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
 import {
@@ -107,15 +107,15 @@ export async function POST(request: Request) {
 
     if (form.jobNumber) {
       const answer = await proof.answerWhatHappened(form.jobNumber);
-      safeLog("info", "Completed allowlisted Job history proof", logContext);
+      safeLog("info", "Completed selected Job history proof", logContext);
       return html(renderProofAnswer(answer, actionUrl, nextSession));
     }
 
     const matches = await proof.searchJobs(form.query!);
     if (matches.length === 0) {
       return html(renderProofMessage(
-        "No approved Job matched",
-        "Try a more specific address or one of the approved Job numbers.",
+        "No Job matched",
+        "Try a more specific address or Job number.",
         actionUrl,
         nextSession,
       ), 404);
@@ -124,20 +124,20 @@ export async function POST(request: Request) {
 
     await takeRateLimit("summary");
     const answer = await proof.answerWhatHappened(matches[0].jobNumber);
-    safeLog("info", "Completed allowlisted Job history proof", logContext);
+    safeLog("info", "Completed selected Job history proof", logContext);
     return html(renderProofAnswer(answer, actionUrl, nextSession));
   } catch (error) {
     if (error instanceof AssistantInputError) {
-      return html(renderProofMessage("Request rejected", "Enter one approved Job address or Job number."), 400);
+      return html(renderProofMessage("Request rejected", "Enter one Job address or Job number."), 400);
     }
     if (error instanceof AssistantRateLimitError) {
       return html(renderProofMessage("Please wait", "The bounded proof is rate limited. Reopen it from ServiceM8 and try again shortly."), 429);
     }
-    if (error instanceof ProofAuthorizationError) {
-      return html(renderProofMessage("Job not approved", "That Job is outside this bounded proof."), 403);
+    if (error instanceof ProofSearchTooBroadError) {
+      return html(renderProofMessage("More detail needed", "Enter a more specific Job address or Job number."), 400);
     }
     if (error instanceof ProofResolutionError) {
-      return html(renderProofMessage("Job not found", "The approved Job could not be resolved uniquely."), 404);
+      return html(renderProofMessage("Job not found", "The selected Job could not be resolved uniquely."), 404);
     }
     if (error instanceof ServiceM8ApiError) {
       safeLog("warn", "ServiceM8 assistant proof failed closed", { requestId, status: error.status });

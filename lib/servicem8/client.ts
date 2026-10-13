@@ -155,6 +155,17 @@ export class ServiceM8Client {
     return records;
   }
 
+  async listJobsPage(cursor: string | null) {
+    if (cursor !== null) uuidSchema.parse(cursor);
+    const query = new URLSearchParams({ cursor: cursor ?? "-1" });
+    const response = await this.request(`job.json?${query}`);
+    const records = await response.json() as unknown;
+    if (!Array.isArray(records)) throw new ServiceM8ApiError("ServiceM8 returned an invalid Job list", 502);
+    const nextCursor = response.headers.get("x-next-cursor");
+    if (nextCursor !== null) uuidSchema.parse(nextCursor);
+    return { records, nextCursor };
+  }
+
   async listJobNotesPage(jobUUID: string, cursor: string | null) {
     uuidSchema.parse(jobUUID);
     if (cursor !== null) uuidSchema.parse(cursor);

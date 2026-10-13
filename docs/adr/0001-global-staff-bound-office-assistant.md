@@ -48,8 +48,7 @@ Office Assistant sign-in is required for the initial global flow.
   correct staff identity, and must not share conversation state.
 - Negative access tests apply to invalid, expired, replayed, or cross-account launches—not to an
   invented Michael-versus-Carla per-Job restriction.
-- Production proof access is limited to the specific test Job cards supplied by the owner. No
-  unrelated Job may be opened, sampled, or used to evaluate the assistant.
-- The owner has approved sending the allowlisted test Jobs' customer fields and diary-note text to
-  OpenAI's API for this proof only. The model is deployment configuration. Adding another Job,
-  source, provider, or purpose requires a new scope decision.
+- Staff may search any Job readable in the connected Royal Glass ServiceM8 account. Only the Job
+  they deliberately select may provide customer fields and diary-note text to OpenAI for the
+  read-only proof. The model is deployment configuration. Adding another source, provider,
+  purpose, write action, or outbound action requires a new scope decision.

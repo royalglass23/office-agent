@@ -36,15 +36,10 @@ A Job returned by an authorised search for a Job Reference. When several Jobs ma
 the Selected Job until the staff member explicitly chooses it.
 _Avoid_: Search hit, assumed Job
 
-**Approved Test Job**:
-A production ServiceM8 Job card the owner explicitly supplies for the first proof. The proof may
-read only Approved Test Jobs and must not browse or sample unrelated Jobs.
-_Avoid_: Any convenient Job, random production Job
-
 **Approved Proof Provider**:
-OpenAI's API, used only for the Approved Test Jobs and the read-only “What happened?” Proof Answer.
+OpenAI's API, used only for the staff-selected Job and the read-only “What happened?” Proof Answer.
 The model remains configuration rather than a domain concept, and this approval does not extend to
-other Jobs, sources, purposes, or providers.
+other sources, purposes, providers, or unselected Jobs.
 _Avoid_: General AI approval, unrestricted production AI
 
 **Observed Job Facts**:

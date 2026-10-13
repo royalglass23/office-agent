@@ -100,8 +100,8 @@ The `DiarySummarizer` receives validated, bounded, normalised text rather than r
 Structured access tokens, callback identity, account fields, contact fields, and attachment binaries
 are not forwarded. Recognisable email addresses, phone numbers, UUIDs, and JWT-shaped strings in
 free-form text are redacted. This pattern-based filtering cannot guarantee removal of every secret
-or personal detail. The owner has made a bounded privacy decision allowing OpenAI API use only for
-the five allowlisted proof Jobs and the read-only “What happened?” workflow.
+or personal detail. The owner has made a bounded privacy decision allowing OpenAI API use for the
+staff-selected Job and only for the read-only “What happened?” workflow.
 
 ## What “Job Diary” means through the documented API
 
