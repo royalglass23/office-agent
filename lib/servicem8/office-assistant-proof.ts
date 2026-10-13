@@ -215,26 +215,48 @@ function buildEmailDraft(
   const approvalUncertain = selectedNotes.some((note) => /\bBC\b.{0,60}\b(?:not|pending|awaiting|unconfirmed|declined|rejected|revoked)\b/i.test(note.text));
   const approvedInEvidence = !approvalUncertain && selectedNotes.some((note) =>
     /\bBC\b\s+(?:(?:has\s+been|was|is)\s+)?approved\b(?!\s*\?)/i.test(note.text));
+  const confirmedMeasure = /^site measure (?:(?:has been|was|is) )?completed[.!]?$/i;
+  const measureNotes = evidence.filter((item) =>
+    item.id.startsWith("note:") && /\bsite measure\b/i.test(item.text));
+  const siteMeasureNote = measureNotes.every((note) => confirmedMeasure.test(note.text))
+    ? selectedNotes.find((note) => confirmedMeasure.test(note.text))
+    : undefined;
   const objective = emailObjective(purpose);
+  const customerUpdate = /^(?:give|provide|send)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(?:progress\s+)?update\b/i.test(objective);
   const subject = programmingRequest
     ? `${job.jobNumber} – ${approvedInEvidence ? "Confirm programming after BC approval" : "Confirm BC status and programming"}`
     : emailSubject(job.jobNumber, objective);
-  const request = programmingRequest
-    ? approvedInEvidence
-      ? "Could you please confirm whether this Job can now be programmed following the BC approval?"
-      : "Could you please confirm whether BC approval has been received and whether this Job can now be programmed?"
+  const programmingQuestion = approvedInEvidence
+    ? "Could you please confirm whether this Job can now be programmed following the BC approval?"
+    : "Could you please confirm whether BC approval has been received and whether this Job can now be programmed?";
+  const request = customerUpdate
+    ? "I wanted to share an update on your Job."
+    : programmingRequest
+    ? programmingQuestion
     : `Could you please ${objective.replace(/^./, (letter) => letter.toLowerCase())}?`;
+  const updates = [
+    customerUpdate && job.status ? `The Job is recorded as ${normalizeText(job.status)}.` : "",
+    siteMeasureNote ? "Our records show the site measure is complete." : "",
+    customerUpdate && programmingRequest ? programmingQuestion : "",
+  ].filter(Boolean);
   const prefix = [
     "Hello,",
     "",
     `I'm writing regarding Job ${job.jobNumber}${address}.`,
   ].join("\n") + "\n\n";
   const suffix = "\n\nKind regards,\nRoyal Glass";
+  const citedNotes = new Set<string>();
+  if (siteMeasureNote) citedNotes.add(siteMeasureNote.id);
+  if (programmingRequest && approvedInEvidence) {
+    for (const note of selectedNotes) {
+      if (/\bBC\b\s+(?:(?:has\s+been|was|is)\s+)?approved\b(?!\s*\?)/i.test(note.text)) citedNotes.add(note.id);
+    }
+  }
 
   return {
     subject,
-    body: `${prefix}${request}${suffix}`.slice(0, MAX_EMAIL_BODY_LENGTH),
-    citations: ["job:record", "company:record", ...selectedNotes.map((note) => note.id)],
+    body: `${prefix}${[request, ...updates].join("\n\n")}${suffix}`.slice(0, MAX_EMAIL_BODY_LENGTH),
+    citations: ["job:record", "company:record", ...citedNotes],
   };
 }
 

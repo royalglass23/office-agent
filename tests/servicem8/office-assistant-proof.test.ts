@@ -133,6 +133,8 @@ describe("bounded Office Assistant proof", () => {
           "",
           "Could you please follow up after the site measure?",
           "",
+          "Our records show the site measure is complete.",
+          "",
           "Kind regards,",
           "Royal Glass",
         ].join("\n"),
@@ -151,6 +153,89 @@ describe("bounded Office Assistant proof", () => {
       "Follow up after the site measure",
     );
     expect(proofReader.getJob).toHaveBeenCalledWith(jobOne.uuid);
+  });
+
+  it("uses and cites a selected diary fact in the draft", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.body).toContain("Our records show the site measure is complete.");
+    expect(result.draft.body).not.toContain("Site measure completed.");
+    expect(result.draft.citations).toContain("note:1");
+  });
+
+  it.each([
+    "Site measure completed? Waiting for confirmation.",
+    "Site measure completed was entered in error; the visit was postponed.",
+  ])("does not turn an uncertain diary note into a completed measure: %s", async (noteText) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [{
+        uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+        text: noteText, createdAt: "2026-09-02T10:30:00Z",
+      }], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.body).not.toContain("site measure is complete");
+    expect(result.draft.citations).not.toContain("note:1");
+  });
+
+  it("does not assert measure completion when Job diary notes conflict", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [
+        { uuid: "fdbe8af2-7590-48cc-8341-e5385879ba33", jobUUID: jobOne.uuid,
+          text: "Site measure completed.", createdAt: "2026-09-02T10:30:00Z" },
+        { uuid: "cb713735-8707-4c57-adbe-019b549c126b", jobUUID: jobOne.uuid,
+          text: "Site measure pending after recheck.", createdAt: "2026-09-03T10:30:00Z" },
+      ], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.body).not.toContain("site measure is complete");
+    expect(result.draft.citations).not.toContain("note:1");
+    expect(result.draft.citations).not.toContain("note:2");
+  });
+
+  it("writes a customer progress update instead of asking someone else to write one", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update");
+
+    expect(result.draft.body).toContain("I wanted to share an update on your Job.");
+    expect(result.draft.body).toContain("The Job is recorded as Work Order.");
+    expect(result.draft.body).not.toContain("Could you please give the customer");
+  });
+
+  it("keeps the BC question in a customer progress update", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader({ readNotesPage: vi.fn(async () => ({ notes: [], nextCursor: null })) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+
+    const result = await proof.draftEmail(
+      "R260766",
+      "Give the customer a progress update and ask whether BC approval has been received before programming.",
+    );
+
+    expect(result.draft.body).toContain("I wanted to share an update on your Job.");
+    expect(result.draft.body).toContain("confirm whether BC approval has been received");
+    expect(result.draft.body).not.toContain("following the BC approval");
   });
 
   it("writes a concise BC programming request without copying notes or addressing a company as a person", async () => {
@@ -406,13 +491,7 @@ describe("bounded Office Assistant proof", () => {
 
     expect(result.draft.body.length).toBeLessThanOrEqual(5_000);
     expect(result.draft.body).toContain("Kind regards,\nRoyal Glass");
-    expect(result.draft.citations).toEqual([
-      "job:record",
-      "company:record",
-      "note:1",
-      "note:2",
-      "note:3",
-    ]);
+    expect(result.draft.citations).toEqual(["job:record", "company:record"]);
   });
 
   it("reauthorises the selected parent Job before reading customer and notes", async () => {
