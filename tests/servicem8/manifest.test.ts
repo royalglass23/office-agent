@@ -26,7 +26,8 @@ describe("ServiceM8 add-on manifest", () => {
     expect(manifest.oauth.scope).toBe("vendor read_jobs read_customers read_job_notes read_staff");
     expect(served.oauth.scope).toBe(manifest.oauth.scope);
     expect(served.version).toBe(manifest.version);
-    expect(served.actions).toEqual(manifest.actions);
+    expect(manifest.actions).toEqual([]);
+    expect(served.actions).toEqual([]);
     expect(manifest.menuItems).toEqual([
       {
         name: "RG Office Assistant",

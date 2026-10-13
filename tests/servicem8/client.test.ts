@@ -54,6 +54,47 @@ describe("ServiceM8Client", () => {
     expect(new Headers(init.headers).get("x-impersonate-uuid")).toBe(staffUUID);
   });
 
+  it("looks up only the explicitly supplied Job numbers with exact filters", async () => {
+    const fetcher = vi.fn(async (url: URL) => Response.json([{
+      uuid: jobUUID,
+      generated_job_id: url.toString().includes("R260766") ? "R260766" : "R260680",
+    }])) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+
+    await expect(client.listJobsByNumber(["R260766", "R260680"])).resolves.toHaveLength(2);
+    const urls = (fetcher as ReturnType<typeof vi.fn>).mock.calls.map(([url]) => new URL(String(url)));
+    expect(urls.map((url) => url.searchParams.get("$filter"))).toEqual([
+      "generated_job_id eq 'R260766'",
+      "generated_job_id eq 'R260680'",
+    ]);
+    expect(urls.every((url) => url.searchParams.get("cursor") === "-1")).toBe(true);
+  });
+
+  it("reads one filtered Job-note page and returns only the server cursor", async () => {
+    const nextCursor = "123e4567-cb72-4d94-8a1e-d454131257eb";
+    const fetcher = vi.fn(async () => Response.json([{ uuid: jobUUID }], {
+      headers: { "x-next-cursor": nextCursor },
+    })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+
+    await expect(client.listJobNotesPage(jobUUID, null)).resolves.toEqual({
+      records: [{ uuid: jobUUID }],
+      nextCursor,
+    });
+    const url = new URL(String((fetcher as ReturnType<typeof vi.fn>).mock.calls[0][0]));
+    expect(url.pathname).toBe("/api_1.0/note.json");
+    expect(url.searchParams.get("$filter")).toBe(`related_object eq 'job' and related_object_uuid eq '${jobUUID}'`);
+    expect(url.searchParams.get("cursor")).toBe("-1");
+  });
+
   it("fails closed when the account has no OAuth connection", async () => {
     const client = new ServiceM8Client(accountUUID, staffUUID, {
       getConnection: vi.fn(async () => null),

@@ -11,6 +11,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   SESSION_SIGNING_SECRET: z.string().min(32),
+  ASSISTANT_PROOF_ENABLED: z.enum(["true", "false"]).optional().default("false"),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_MODEL: z.string().min(1).max(200).optional(),
+  OPENAI_DATA_CONTROLS_VERIFIED: z.enum(["true", "false"]).optional().default("false"),
 });
 
 export type PhaseZeroConfig = {
@@ -22,6 +26,7 @@ export type PhaseZeroConfig = {
   databaseUrl: string;
   tokenEncryptionKey: string;
   sessionSigningSecret: string;
+  assistantProof: { enabled: false } | { enabled: true; apiKey: string; model: string };
 };
 
 let cached: PhaseZeroConfig | undefined;
@@ -51,6 +56,13 @@ export function getConfig(): PhaseZeroConfig {
   if (appBaseUrl.host !== oauthRedirectUri.host) {
     throw new Error("OAuth redirect host must match APP_BASE_URL");
   }
+  const proofEnabled = env.ASSISTANT_PROOF_ENABLED === "true";
+  if (proofEnabled && env.OPENAI_DATA_CONTROLS_VERIFIED !== "true") {
+    throw new Error("OPENAI_DATA_CONTROLS_VERIFIED must be true before enabling the assistant proof");
+  }
+  if (proofEnabled && (!env.OPENAI_API_KEY || !env.OPENAI_MODEL)) {
+    throw new Error("OPENAI_API_KEY and OPENAI_MODEL are required when the assistant proof is enabled");
+  }
 
   cached = {
     appBaseUrl,
@@ -61,6 +73,9 @@ export function getConfig(): PhaseZeroConfig {
     databaseUrl: databaseUrl.toString(),
     tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY,
     sessionSigningSecret: env.SESSION_SIGNING_SECRET,
+    assistantProof: proofEnabled
+      ? { enabled: true, apiKey: env.OPENAI_API_KEY!, model: env.OPENAI_MODEL! }
+      : { enabled: false },
   };
   return cached;
 }

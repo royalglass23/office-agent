@@ -1,20 +1,11 @@
 {
   "$schema": "https://api.servicem8.com/api_1.0/addonsdk/manifest-schema/v1.json",
   "name": "RG Office Assistant",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "oauth": {
     "scope": "vendor read_jobs read_customers read_job_notes read_staff"
   },
-  "actions": [
-    {
-      "name": "RG Office Assistant",
-      "type": "online",
-      "entity": "job",
-      "event": "rg_office_assistant",
-      "location": "modal",
-      "iconURL": "https://office-agent-ashy.vercel.app/icon.png"
-    }
-  ],
+  "actions": [],
   "menuItems": [
     {
       "name": "RG Office Assistant",

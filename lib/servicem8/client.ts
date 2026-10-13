@@ -78,7 +78,7 @@ export class ServiceM8Client {
     }
   }
 
-  private async get(path: string) {
+  private async request(path: string) {
     let connection = await this.connection();
     for (let attempt = 0; attempt < 3; attempt += 1) {
       let response: Response;
@@ -101,7 +101,7 @@ export class ServiceM8Client {
         throw new ServiceM8ApiError("ServiceM8 request timed out", 503, true);
       }
 
-      if (response.ok) return response.json() as Promise<unknown>;
+      if (response.ok) return response;
       if (response.status === 401 && attempt === 0) {
         connection = await this.connection(true, connection.accessToken);
         continue;
@@ -121,6 +121,10 @@ export class ServiceM8Client {
     throw new ServiceM8ApiError("ServiceM8 request failed", 503, true);
   }
 
+  private async get(path: string) {
+    return (await this.request(path)).json() as Promise<unknown>;
+  }
+
   getVendor() {
     return this.get("vendor.json");
   }
@@ -134,6 +138,36 @@ export class ServiceM8Client {
     uuidSchema.parse(jobUUID);
     const query = new URLSearchParams({ $filter: `uuid eq '${jobUUID}'` });
     return this.get(`job.json?${query}`);
+  }
+
+  async listJobsByNumber(jobNumbers: readonly string[]) {
+    const records: unknown[] = [];
+    for (const jobNumber of jobNumbers) {
+      if (!/^[A-Z]\d{6}$/.test(jobNumber)) throw new Error("Invalid ServiceM8 Job number");
+      const query = new URLSearchParams({
+        $filter: `generated_job_id eq '${jobNumber}'`,
+        cursor: "-1",
+      });
+      const page = await this.get(`job.json?${query}`);
+      if (!Array.isArray(page)) throw new ServiceM8ApiError("ServiceM8 returned an invalid Job list", 502);
+      records.push(...page);
+    }
+    return records;
+  }
+
+  async listJobNotesPage(jobUUID: string, cursor: string | null) {
+    uuidSchema.parse(jobUUID);
+    if (cursor !== null) uuidSchema.parse(cursor);
+    const query = new URLSearchParams({
+      $filter: `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`,
+      cursor: cursor ?? "-1",
+    });
+    const response = await this.request(`note.json?${query}`);
+    const records = await response.json() as unknown;
+    if (!Array.isArray(records)) throw new ServiceM8ApiError("ServiceM8 returned an invalid Note list", 502);
+    const nextCursor = response.headers.get("x-next-cursor");
+    if (nextCursor !== null) uuidSchema.parse(nextCursor);
+    return { records, nextCursor };
   }
 
   getCompany(companyUUID: string) {
