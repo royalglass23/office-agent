@@ -2,6 +2,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import {
   renderConversationDraftPrompt,
+  renderConversationAssistant,
   renderJobContext,
   renderJobMatches,
   renderEmailDraft,
@@ -11,6 +12,28 @@ import {
 } from "@/lib/servicem8/render-context-html";
 
 describe("renderMenuAssistant", () => {
+  it("loads the signed staff name after the opening page is rendered", async () => {
+    const html = renderConversationAssistant(null, new URL("https://office.example.test/assistant"), "signed-session-token");
+    const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
+    expect(script).toBeDefined();
+    const greeting = { textContent: "Opening RG Office Assistant…" };
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ first: "May" }) }));
+    runInNewContext(script!, {
+      document: {
+        getElementById: () => greeting,
+        querySelector: () => ({ value: "signed-session-token" }),
+        addEventListener: () => undefined,
+      },
+      fetch: fetcher,
+      URLSearchParams,
+    });
+    await vi.waitFor(() => expect(greeting.textContent).toBe("Hi, May—what can I help with?"));
+    expect(fetcher).toHaveBeenCalledWith("https://office.example.test/assistant/staff", expect.objectContaining({
+      method: "POST",
+      credentials: "omit",
+    }));
+  });
+
   it("renders and escapes the resolved staff first name", () => {
     const html = renderMenuAssistant(`<script>alert("name")</script>`);
     expect(html).toContain('Hi, &lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;—anything I can help with?');

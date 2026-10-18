@@ -11,6 +11,7 @@ const {
   proof,
   requireVendorAccount,
   verifyAssistantSession,
+  getStaff,
 } = vi.hoisted(() => {
   const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
   return {
@@ -34,6 +35,7 @@ const {
     issueAssistantSession: vi.fn(async () => "next-session-token"),
     proof,
     requireVendorAccount: vi.fn(async () => undefined),
+    getStaff: vi.fn(async (staffUUID: string) => ({ first: staffUUID ? "May" : "" })),
     verifyAssistantSession: vi.fn(async () => ({
       accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
       staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
@@ -58,6 +60,7 @@ vi.mock("@/lib/servicem8/client", () => ({
   ServiceM8ApiError: class ServiceM8ApiError extends Error {},
   ServiceM8Client: class ServiceM8Client {
     constructor(...args: unknown[]) { clientConstructor(...args); }
+    getStaff(staffUUID: string) { return getStaff(staffUUID); }
   },
   requireVendorAccount,
 }));
@@ -334,7 +337,10 @@ describe("assistant proof route", () => {
     expect(response.status).toBe(200);
     expect(body).toContain("what can I help with?");
     expect(body).toContain('name="session" value="next-session-token"');
-    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(clientConstructor).toHaveBeenCalledOnce();
+    expect(requireVendorAccount).toHaveBeenCalledOnce();
+    expect(getStaff).toHaveBeenCalledWith("9d914a06-221e-4013-8b4d-2735272710eb");
+    expect(body).toContain("Hi, May—what can I help with?");
     expect(issueAssistantSession).toHaveBeenCalledWith(
       expect.objectContaining({
         accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",

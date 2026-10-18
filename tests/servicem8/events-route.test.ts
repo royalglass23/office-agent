@@ -190,10 +190,12 @@ describe("ServiceM8 event route", () => {
       accountUUID: event.auth.accountUUID,
       staffUUID: event.auth.staffUUID,
     }, "session-secret-with-at-least-thirty-two-bytes");
+    expect(requireVendorAccount).not.toHaveBeenCalled();
+    expect(getStaff).not.toHaveBeenCalled();
     const { eventResponse } = await response.json();
     expect(eventResponse).toContain('action="https://office.example.test/assistant"');
     expect(eventResponse).toContain('name="session" value="signed-assistant-session"');
-    expect(eventResponse).toContain("Hi, May—what can I help with?");
+    expect(eventResponse).toContain("Opening RG Office Assistant…");
     expect(eventResponse).toContain('name="message"');
     expect(eventResponse).toContain("What happened to R260766?");
     expect(eventResponse).not.toContain(event.auth.accountUUID);

@@ -144,7 +144,10 @@ export async function POST(request: Request) {
 
     if (form.restart) {
       const nextSession = await issueAssistantSession(identity, config.sessionSigningSecret, new Date(), identity.launchExpiresAt);
-      return html(renderConversationAssistant("there", actionUrl, nextSession));
+      const client = new ServiceM8Client(identity.accountUUID, identity.staffUUID);
+      await requireVendorAccount(client, identity.accountUUID);
+      const staff = await client.getStaff(identity.staffUUID);
+      return html(renderConversationAssistant(staff.first, actionUrl, nextSession));
     }
 
     const conversationIntent = form.message ? parseConversationMessage(form.message) : null;
