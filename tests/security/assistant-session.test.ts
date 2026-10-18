@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   assistantRateLimit,
+  issueAssistantGreetingSession,
   issueAssistantSession,
+  verifyAssistantGreetingSession,
   verifyAssistantSession,
 } from "@/lib/security/assistant-session";
 
@@ -49,6 +51,28 @@ describe("staff-bound assistant session", () => {
       secret,
       new Date("2030-01-01T00:01:00Z"),
     )).rejects.toThrow("Assistant session is invalid");
+  });
+
+  it("keeps the one-time greeting credential separate from assistant action sessions", async () => {
+    const now = new Date("2030-01-01T00:00:00Z");
+    const greetingToken = await issueAssistantGreetingSession(identity, secret, now);
+    const actionToken = await issueAssistantSession(identity, secret, now);
+
+    await expect(verifyAssistantGreetingSession(
+      greetingToken,
+      secret,
+      new Date("2030-01-01T00:01:00Z"),
+    )).resolves.toEqual(identity);
+    await expect(verifyAssistantSession(
+      greetingToken,
+      secret,
+      new Date("2030-01-01T00:01:00Z"),
+    )).rejects.toThrow("Assistant session is invalid");
+    await expect(verifyAssistantGreetingSession(
+      actionToken,
+      secret,
+      new Date("2030-01-01T00:01:00Z"),
+    )).rejects.toThrow("Assistant greeting session is invalid");
   });
 
   it("creates account-and-staff-bound rate-limit buckets", () => {

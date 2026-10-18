@@ -1,7 +1,12 @@
 import { getConfig } from "@/lib/config";
-import { verifyAssistantSession } from "@/lib/security/assistant-session";
+import {
+  assistantGreetingSessionHash,
+  assistantRateLimit,
+  verifyAssistantGreetingSession,
+} from "@/lib/security/assistant-session";
 import { correlationId, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
+import { consumeEventHash } from "@/lib/storage/consumed-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,9 +49,29 @@ export async function POST(request: Request) {
     }
     let identity;
     try {
-      identity = await verifyAssistantSession(sessions[0], config.sessionSigningSecret);
+      identity = await verifyAssistantGreetingSession(sessions[0], config.sessionSigningSecret);
     } catch {
       return Response.json({ error: "Session expired" }, { status: 401, headers: responseHeaders });
+    }
+    const limit = assistantRateLimit(identity, "request");
+    let requestAllowed = false;
+    for (const hash of limit.hashes) {
+      if (await consumeEventHash(hash, limit.expiresAt)) {
+        requestAllowed = true;
+        break;
+      }
+    }
+    if (!requestAllowed) {
+      return Response.json({ error: "Please wait" }, {
+        status: 429,
+        headers: { ...responseHeaders, "Retry-After": String(limit.retryAfterSeconds) },
+      });
+    }
+    if (!(await consumeEventHash(
+      assistantGreetingSessionHash(sessions[0]),
+      new Date(Date.now() + 3 * 60 * 1000),
+    ))) {
+      return Response.json({ error: "Session already used" }, { status: 409, headers: responseHeaders });
     }
     const client = new ServiceM8Client(identity.accountUUID, identity.staffUUID);
     await requireVendorAccount(client, identity.accountUUID);

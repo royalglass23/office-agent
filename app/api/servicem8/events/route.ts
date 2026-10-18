@@ -1,5 +1,5 @@
 import { getConfig } from "@/lib/config";
-import { issueAssistantSession } from "@/lib/security/assistant-session";
+import { issueAssistantGreetingSession, issueAssistantSession } from "@/lib/security/assistant-session";
 import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import { loadPhaseZeroJobContext } from "@/lib/servicem8/job-context";
@@ -63,12 +63,16 @@ export async function POST(request: Request) {
 
     if (verified.event.eventName === "rg_office_assistant_menu") {
       if (config.assistantProof.enabled) {
-        const session = await issueAssistantSession(verified.event.auth, config.sessionSigningSecret);
+        const [session, greetingSession] = await Promise.all([
+          issueAssistantSession(verified.event.auth, config.sessionSigningSecret),
+          issueAssistantGreetingSession(verified.event.auth, config.sessionSigningSecret),
+        ]);
         safeLog("info", "Completed global menu launch", identifiers);
         return addonResponse(renderConversationAssistant(
           null,
           new URL("/assistant", config.appBaseUrl),
           session,
+          greetingSession,
         ));
       }
       const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);
