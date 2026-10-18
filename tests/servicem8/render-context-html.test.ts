@@ -13,15 +13,22 @@ import {
 
 describe("renderMenuAssistant", () => {
   it("loads the signed staff name after the opening page is rendered", async () => {
-    const html = renderConversationAssistant(null, new URL("https://office.example.test/assistant"), "signed-session-token");
+    const html = renderConversationAssistant(
+      null,
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+      "signed-greeting-token",
+    );
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
     expect(script).toBeDefined();
     const greeting = { textContent: "Opening RG Office Assistant…" };
-    const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ first: "May" }) }));
+    const fetcher = vi.fn(async (_url: string, _request: { body: URLSearchParams }) => ({
+      ok: true,
+      json: async () => ({ first: "May" }),
+    }));
     runInNewContext(script!, {
       document: {
         getElementById: () => greeting,
-        querySelector: () => ({ value: "signed-session-token" }),
         addEventListener: () => undefined,
       },
       fetch: fetcher,
@@ -32,6 +39,8 @@ describe("renderMenuAssistant", () => {
       method: "POST",
       credentials: "omit",
     }));
+    const request = fetcher.mock.calls[0][1];
+    expect(request.body.toString()).toBe("session=signed-greeting-token");
   });
 
   it("renders and escapes the resolved staff first name", () => {

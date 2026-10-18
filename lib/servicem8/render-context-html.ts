@@ -144,10 +144,12 @@ export function renderConversationAssistant(
   staffFirstName: string | null,
   actionUrl: URL,
   sessionToken: string,
+  greetingSessionToken?: string,
 ) {
   const greeting = staffFirstName === null ? "Opening RG Office Assistant…" : `Hi, ${escapeHtml(staffFirstName)}—what can I help with?`;
+  if (staffFirstName === null && !greetingSessionToken) throw new Error("Greeting session is required");
   const nameScript = staffFirstName === null
-    ? `const greeting=document.getElementById("assistant-greeting");const session=document.querySelector('input[name="session"]');if(greeting&&session){fetch(${JSON.stringify(new URL("/assistant/staff", actionUrl).toString())},{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({session:session.value}),credentials:"omit",cache:"no-store",redirect:"error"}).then(function(response){if(!response.ok)throw new Error("staff lookup failed");return response.json();}).then(function(result){if(typeof result.first!=="string"||result.first.length===0)throw new Error("staff name unavailable");greeting.textContent="Hi, "+result.first+"—what can I help with?";}).catch(function(){greeting.textContent="What can I help with?";});}`
+    ? `const greeting=document.getElementById("assistant-greeting");if(greeting){fetch(${JSON.stringify(new URL("/assistant/staff", actionUrl).toString())},{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({session:${JSON.stringify(greetingSessionToken)}}),credentials:"omit",cache:"no-store",redirect:"error"}).then(function(response){if(!response.ok)throw new Error("staff lookup failed");return response.json();}).then(function(result){if(typeof result.first!=="string"||result.first.length===0)throw new Error("staff name unavailable");greeting.textContent="Hi, "+result.first+"—what can I help with?";}).catch(function(){greeting.textContent="What can I help with?";});}`
     : "";
   return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1 id="assistant-greeting" aria-live="polite">${greeting}</h1><section class="conversation" aria-live="polite"><div class="message assistant"><p>I can help with two read-only tasks:</p><ul><li>What happened to an exact Job number?</li><li>Prepare a review-only email draft for an exact Job number.</li></ul><p>For example: <strong>What happened to R260766?</strong></p></div></section>${conversationForm(actionUrl, sessionToken)}<p class="coverage"><strong>Coverage:</strong> core Job/customer fields and Job diary notes. Not checked: email, SMS, forms, attachments, schedule activity.</p></main>`, conversationStyles, `${nameScript}${proofSubmitOnceScript}`, actionUrl.origin);
 }

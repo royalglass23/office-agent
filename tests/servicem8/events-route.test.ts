@@ -1,7 +1,7 @@
 import { SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistantSession, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
+const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistantGreetingSession, issueAssistantSession, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
   consumeEventHash: vi.fn(async () => true),
   clientConstructor: vi.fn(),
   getConfig: vi.fn(() => ({
@@ -12,6 +12,7 @@ const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistant
     assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
   })),
   getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
+  issueAssistantGreetingSession: vi.fn(async () => "signed-greeting-session"),
   issueAssistantSession: vi.fn(async () => "signed-assistant-session"),
   requireVendorAccount: vi.fn(async () => undefined),
   loadPhaseZeroJobContext: vi.fn(async () => ({
@@ -25,7 +26,7 @@ const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistant
 }));
 
 vi.mock("@/lib/config", () => ({ getConfig }));
-vi.mock("@/lib/security/assistant-session", () => ({ issueAssistantSession }));
+vi.mock("@/lib/security/assistant-session", () => ({ issueAssistantGreetingSession, issueAssistantSession }));
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
 vi.mock("@/lib/security/safe-log", () => ({
   correlationId: () => "test-request-id",
@@ -190,11 +191,16 @@ describe("ServiceM8 event route", () => {
       accountUUID: event.auth.accountUUID,
       staffUUID: event.auth.staffUUID,
     }, "session-secret-with-at-least-thirty-two-bytes");
+    expect(issueAssistantGreetingSession).toHaveBeenCalledWith({
+      accountUUID: event.auth.accountUUID,
+      staffUUID: event.auth.staffUUID,
+    }, "session-secret-with-at-least-thirty-two-bytes");
     expect(requireVendorAccount).not.toHaveBeenCalled();
     expect(getStaff).not.toHaveBeenCalled();
     const { eventResponse } = await response.json();
     expect(eventResponse).toContain('action="https://office.example.test/assistant"');
     expect(eventResponse).toContain('name="session" value="signed-assistant-session"');
+    expect(eventResponse).toContain("signed-greeting-session");
     expect(eventResponse).toContain("Opening RG Office Assistant…");
     expect(eventResponse).toContain('name="message"');
     expect(eventResponse).toContain("What happened to R260766?");
