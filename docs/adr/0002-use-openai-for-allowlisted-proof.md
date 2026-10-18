@@ -2,26 +2,37 @@
 status: accepted
 ---
 
-# Use OpenAI only for the allowlisted read-only proof
+# Use OpenAI only for selected-Job read-only proofs
 
 OpenAI's API is the Approved Proof Provider for the first Office Assistant proof. The application
-may send bounded, normalised core Job/customer fields and diary-note text only from `R260766`,
-`R260680`, `R260209`, `R260270`, and `R260208`, and only to answer “What happened to this Job?”
-The configured model must be recorded with the test evidence.
+may send bounded, normalised core Job/customer fields and diary-note text from any Job that the
+authenticated staff member deliberately selects in the connected Royal Glass ServiceM8 account,
+and only to answer “What happened to this Job?” or create a staff-requested, review-only Email
+Draft. The configured model must be recorded with the test evidence. Search results are not sent
+to OpenAI; only the selected and re-read parent Job proceeds to customer, note, summarisation, or
+drafting access. The owner explicitly authorised the Email Draft proof after accepting the bounded
+“What happened?” production proof on 13 October 2026.
 
 ## Considered Options
 
 - A deterministic summarizer proves the data pipeline but does not prove that an AI office
   assistant can produce a useful grounded explanation.
-- Approving OpenAI for all production Jobs would accelerate later testing but would exceed the
-  owner's current data and feature authorization.
+- A five-Job allowlist reduced the initial production proof surface, but the owner explicitly
+  removed that restriction on 13 October 2026 so staff can use the assistant as an account-wide
+  office tool.
 
 ## Consequences
 
-- Requests for any Job outside the allowlist must not send Job data to OpenAI during the proof.
-- Email drafting, Suggested Next Actions, additional ServiceM8 sources, writes, and outbound
-  messages remain excluded.
-- Adding a Job, source, provider, or purpose requires a new explicit scope decision.
+- Search and every subsequent Job read remain bound to the authenticated staff identity.
+- The selected parent Job must be re-read before customer or diary-note access.
+- No unselected search result may be sent to OpenAI.
+- Email Drafts use a staff-supplied purpose and the same bounded evidence. They are displayed for
+  review and copying; the assistant has no send or ServiceM8-save action. OpenAI returns only
+  authorised evidence IDs, and server code constructs every visible word of the draft.
+- Suggested Next Actions, additional ServiceM8 sources, writes, and outbound messages remain
+  excluded.
+- Adding a source, provider, purpose, write action, or outbound action requires a new explicit
+  scope decision.
 - Structured credentials, callback claims, account identifiers, raw API objects, and attachment
   binaries remain excluded from model input.
 - The owner's content approval does not replace verification of the configured OpenAI API

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  assistantRateLimit,
+  assistantSessionHash,
   clientConstructor,
   consumeEventHash,
   createOfficeAssistantProof,
@@ -10,10 +12,19 @@ const {
   requireVendorAccount,
   verifyAssistantSession,
 } = vi.hoisted(() => {
-  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn() };
+  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
   return {
+    assistantRateLimit: vi.fn((_: unknown, action: "request" | "search" | "summary" | "draft") => ({
+      hashes: Array.from(
+        { length: action === "request" ? 20 : action === "search" ? 10 : 5 },
+        (_, index) => `${action}-slot-${index}`,
+      ),
+      expiresAt: new Date("2030-01-01T00:02:00Z"),
+      retryAfterSeconds: 37,
+    })),
+    assistantSessionHash: vi.fn((token: string) => `session-${token}`),
     clientConstructor: vi.fn(),
-    consumeEventHash: vi.fn(async () => true),
+    consumeEventHash: vi.fn(async (hash: string, expiresAt: Date) => hash.length > 0 && expiresAt.getTime() > 0),
     createOfficeAssistantProof: vi.fn(() => proof),
     getConfig: vi.fn(() => ({
       appBaseUrl: new URL("https://office.example.test"),
@@ -32,8 +43,8 @@ const {
 
 vi.mock("@/lib/config", () => ({ getConfig }));
 vi.mock("@/lib/security/assistant-session", () => ({
-  assistantRateLimit: () => ({ hash: "b".repeat(64), expiresAt: new Date("2030-01-01T00:02:00Z") }),
-  assistantSessionHash: () => "a".repeat(64),
+  assistantRateLimit,
+  assistantSessionHash,
   issueAssistantSession,
   verifyAssistantSession,
 }));
@@ -55,15 +66,16 @@ vi.mock("@/lib/servicem8/proof-reader", () => ({
 }));
 vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
   createOfficeAssistantProof,
-  ProofAuthorizationError: class ProofAuthorizationError extends Error {},
   ProofResolutionError: class ProofResolutionError extends Error {},
+  ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
 }));
 vi.mock("@/lib/openai/proof-summarizer", () => ({
   OpenAIProofError: class OpenAIProofError extends Error {},
   createOpenAIProofSummarizer: () => ({ summarize: vi.fn() }),
 }));
 
-import { POST } from "@/app/assistant/route";
+import { OPTIONS, POST } from "@/app/assistant/route";
+import { ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -87,20 +99,151 @@ describe("assistant proof route", () => {
   });
 
   it("rejects replay of an otherwise valid assistant form", async () => {
-    consumeEventHash.mockResolvedValueOnce(false);
+    consumeEventHash.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const response = await POST(request({ session: "used-session", query: "R260766" }));
     expect(response.status).toBe(409);
     expect(clientConstructor).not.toHaveBeenCalled();
   });
 
-  it("rate limits repeated expensive proof work before ServiceM8 access", async () => {
-    consumeEventHash.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    const response = await POST(request({ session: "valid-session", jobNumber: "R260766" }));
+  it("rate limits guidance requests before rotating a session", async () => {
+    consumeEventHash.mockImplementation(async (hash: string) => !hash.startsWith("request-slot-"));
+
+    const response = await POST(request({
+      session: "valid-session",
+      message: "Help me with R260766",
+    }));
+
     expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("37");
+    expect(issueAssistantSession).not.toHaveBeenCalled();
     expect(clientConstructor).not.toHaveBeenCalled();
   });
 
-  it("shows an explicit choice when more than one approved Job matches", async () => {
+  it("limits concurrent guidance requests without ServiceM8 access", async () => {
+    const consumed = new Set<string>();
+    consumeEventHash.mockImplementation(async (hash: string) => {
+      if (consumed.has(hash)) return false;
+      consumed.add(hash);
+      return true;
+    });
+
+    const responses = await Promise.all(Array.from({ length: 21 }, (_, index) => POST(request({
+      session: `guidance-session-${index}`,
+      message: "Help me with R260766",
+    }))));
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      ...Array.from({ length: 20 }, () => 200),
+      429,
+    ]);
+    expect(issueAssistantSession).toHaveBeenCalledTimes(20);
+    expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("throttles replay flooding of one used session", async () => {
+    const consumed = new Set<string>();
+    consumeEventHash.mockImplementation(async (hash: string) => {
+      if (consumed.has(hash)) return false;
+      consumed.add(hash);
+      return true;
+    });
+
+    const responses = await Promise.all(Array.from({ length: 21 }, () => POST(request({
+      session: "replayed-guidance-session",
+      message: "Help me with R260766",
+    }))));
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200,
+      ...Array.from({ length: 19 }, () => 409),
+      429,
+    ]);
+    expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("rate limits repeated expensive proof work before ServiceM8 access", async () => {
+    consumeEventHash
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+    const response = await POST(request({ session: "valid-session", jobNumber: "R260766" }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("37");
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(issueAssistantSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
+        staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
+      }),
+      "session-secret-with-at-least-thirty-two-bytes",
+      expect.any(Date),
+      undefined,
+    );
+    const body = await response.text();
+    expect(body).toContain("Wait 37 seconds and try again");
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(body).not.toContain("Reopen it from ServiceM8");
+  });
+
+  it("allows five concurrent summaries and rate limits the sixth", async () => {
+    const consumed = new Set<string>();
+    consumeEventHash.mockImplementation(async (hash: string) => {
+      if (consumed.has(hash)) return false;
+      consumed.add(hash);
+      return true;
+    });
+    proof.answerWhatHappened.mockResolvedValue({
+      job: { jobNumber: "R260766", address: "10 Queen Street", status: "Work Order", customerName: "Example" },
+      summary: { text: "The site measure was completed.", citations: ["note:1"] },
+      timeline: [],
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    });
+
+    const responses = await Promise.all(Array.from({ length: 6 }, (_, index) => POST(request({
+      session: `valid-session-${index}`,
+      jobNumber: "R260766",
+    }))));
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200, 200, 200, 200, 429]);
+    expect(proof.answerWhatHappened).toHaveBeenCalledTimes(5);
+    expect(clientConstructor).toHaveBeenCalledTimes(5);
+  });
+
+  it("allows ten concurrent searches and rate limits the eleventh independently", async () => {
+    const consumed = new Set<string>();
+    consumeEventHash.mockImplementation(async (hash: string) => {
+      if (consumed.has(hash)) return false;
+      consumed.add(hash);
+      return true;
+    });
+    proof.searchJobs.mockResolvedValue([
+      { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
+      { jobNumber: "R260680", address: "10 Queen Road", status: "Work Order" },
+    ]);
+
+    const responses = await Promise.all(Array.from({ length: 11 }, (_, index) => POST(request({
+      session: `search-session-${index}`,
+      query: "10 Queen",
+    }))));
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 429,
+    ]);
+    expect(proof.searchJobs).toHaveBeenCalledTimes(10);
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+  });
+
+  it("shows an explicit choice when more than one Job matches", async () => {
     proof.searchJobs.mockResolvedValueOnce([
       { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
       { jobNumber: "R260680", address: "10 Queen Road", status: "Work Order" },
@@ -116,7 +259,16 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
   });
 
-  it("returns the bounded proof answer for one selected approved Job", async () => {
+  it("asks for a more specific reference when a search has too many matches", async () => {
+    proof.searchJobs.mockRejectedValueOnce(new ProofSearchTooBroadError());
+    const response = await POST(request({ session: "valid-session", query: "Auckland" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("More detail needed");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+  });
+
+  it("returns the bounded proof answer for one selected Job", async () => {
     proof.answerWhatHappened.mockResolvedValueOnce({
       job: { jobNumber: "R260766", address: "10 Queen Street", status: "Work Order", customerName: "Example" },
       summary: { text: "The site measure was completed.", citations: ["note:1"] },
@@ -134,5 +286,177 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).toHaveBeenCalledWith("R260766");
     expect(await response.text()).toContain("The site measure was completed.");
     expect(issueAssistantSession).toHaveBeenCalled();
+  });
+
+  it("answers a natural-language What happened message for one exact Job number", async () => {
+    proof.answerWhatHappened.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", status: "Work Order", customerName: "Example" },
+      summary: { text: "The site measure was completed.", citations: ["note:1"] },
+      timeline: [{ at: "2026-09-02T10:30:00.000Z", text: "Site measure completed.", citations: ["note:1"] }],
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    });
+
+    const response = await POST(request({
+      session: "valid-session",
+      message: "What happened to R260766?",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(proof.answerWhatHappened).toHaveBeenCalledWith("R260766");
+    const body = await response.text();
+    expect(body).toContain("What happened to R260766?");
+    expect(body).toContain("The site measure was completed.");
+    expect(body).toContain('name="message"');
+  });
+
+  it("keeps an unknown Job inside the conversation without exposing Job evidence", async () => {
+    proof.answerWhatHappened.mockRejectedValueOnce(new ProofResolutionError());
+    const response = await POST(request({ session: "valid-session", message: "What happened to R000000?" }));
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain("R000000");
+    expect(body).toContain("couldn’t find");
+    expect(body).toContain('name="message"');
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(body).not.toContain("selected Job could not be resolved uniquely");
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("starts a fresh, staff-bound conversation without reading a Job", async () => {
+    const response = await POST(request({ session: "valid-session", restart: "1" }));
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain("what can I help with?");
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(issueAssistantSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
+        staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
+      }),
+      "session-secret-with-at-least-thirty-two-bytes",
+      expect.any(Date),
+      undefined,
+    );
+  });
+
+  it("allows a credential-free ServiceM8 iframe to read its signed POST response", async () => {
+    const response = await POST(new Request("https://office.example.test/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://app.servicem8.com" },
+      body: new URLSearchParams({ session: "valid-session", message: "Help me with R260766" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(response.headers.get("location")).toBeNull();
+    expect(await response.text()).toContain('name="message"');
+  });
+
+  it("permits only form POST preflight without allowing browser credentials", () => {
+    const response = OPTIONS();
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBe("POST, OPTIONS");
+    expect(response.headers.get("access-control-allow-headers")).toBe("Content-Type");
+    expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+  });
+
+  it("asks for the purpose before drafting an email from a conversational request", async () => {
+    const response = await POST(request({
+      session: "valid-session",
+      message: "Draft me an email for R260766",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+    const body = await response.text();
+    expect(body).toContain("Draft me an email for R260766");
+    expect(body).toContain("What should the email achieve?");
+    expect(body).toContain('name="jobNumber" value="R260766"');
+    expect(body).toContain("Nothing will be sent");
+  });
+
+  it("does not read ServiceM8 for unsupported or autonomous requests", async () => {
+    const response = await POST(request({
+      session: "valid-session",
+      message: "Send an email for R260766 now",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+    const body = await response.text();
+    expect(body).toContain("Ask what happened to the Job, or ask for an email draft.");
+    expect(body).toContain('name="message"');
+    expect(body).not.toContain('name="query"');
+    expect(body).not.toContain("Send email");
+  });
+
+  it("does not read ServiceM8 when a conversation names more than one Job", async () => {
+    const response = await POST(request({
+      session: "valid-session",
+      message: "What happened between R260766 and R260680?",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+    expect(await response.text()).toContain("Include one exact Job number");
+  });
+
+  it("does not read ServiceM8 when a conversation requests both supported intents", async () => {
+    const response = await POST(request({
+      session: "valid-session",
+      message: "What happened to R260766 and draft an email",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+    expect(await response.text()).toContain("Ask for one task at a time");
+  });
+
+  it("returns a review-only email draft for one selected Job and purpose", async () => {
+    proof.draftEmail.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Follow up on the site measure",
+      draft: {
+        subject: "Site measure follow-up",
+        body: "Hi Example,\n\nThe site measure has been completed.",
+        citations: ["company:record", "note:1"],
+      },
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    });
+
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailPurpose: "Follow up on the site measure",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
+    const body = await response.text();
+    expect(body).toContain("Site measure follow-up");
+    expect(body).toContain("nothing was sent");
+    expect(body).not.toContain("Send email");
   });
 });

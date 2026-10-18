@@ -1,4 +1,6 @@
 import { getConfig } from "@/lib/config";
+import { parseConversationMessage } from "@/lib/assistant/conversation";
+import { createOpenAIEmailDrafter, OpenAIEmailDraftError } from "@/lib/openai/email-drafter";
 import { createOpenAIProofSummarizer, OpenAIProofError } from "@/lib/openai/proof-summarizer";
 import {
   assistantRateLimit,
@@ -10,12 +12,17 @@ import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-lo
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import {
   createOfficeAssistantProof,
-  ProofAuthorizationError,
   ProofResolutionError,
+  ProofSearchTooBroadError,
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
 import {
+  renderEmailDraft,
   renderJobMatches,
+  renderConversationDraftPrompt,
+  renderConversationGuidance,
+  renderConversationProofAnswer,
+  renderConversationAssistant,
   renderProofAnswer,
   renderProofMessage,
 } from "@/lib/servicem8/render-context-html";
@@ -29,13 +36,24 @@ const responseHeaders = {
   "Content-Type": "text/html; charset=utf-8",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
+  "Access-Control-Allow-Origin": "*",
 };
 
-class AssistantInputError extends Error {}
-class AssistantRateLimitError extends Error {}
+export function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...responseHeaders,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
 
-function html(body: string, status = 200) {
-  return new Response(body, { status, headers: responseHeaders });
+class AssistantInputError extends Error {}
+
+function html(body: string, status = 200, extraHeaders: Record<string, string> = {}) {
+  return new Response(body, { status, headers: { ...responseHeaders, ...extraHeaders } });
 }
 
 async function readForm(request: Request) {
@@ -52,12 +70,40 @@ async function readForm(request: Request) {
     return values[0];
   };
   const session = singleton("session", 4_096);
+  const restartValues = form.getAll("restart");
+  if (restartValues.length > 0) {
+    if (restartValues.length !== 1 || restartValues[0] !== "1" || form.size !== 2) {
+      throw new AssistantInputError("Invalid restart request");
+    }
+    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, emailPurpose: undefined };
+  }
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
+  const purposeValues = form.getAll("emailPurpose");
+  const messageValues = form.getAll("message").filter((value) => value.trim().length > 0);
+  if (messageValues.length > 1 || (messageValues.length === 1 && messageValues[0].length > 500)) {
+    throw new AssistantInputError("Invalid message");
+  }
+  if (messageValues.length === 1) {
+    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0) {
+      throw new AssistantInputError("Choose a message or one proof action");
+    }
+    return { session, message: messageValues[0].trim() };
+  }
   if (queryValues.length + jobValues.length !== 1) throw new AssistantInputError("Choose a search or one Job");
   if (queryValues.length === 1 && queryValues[0].length > 200) throw new AssistantInputError("Search is too long");
   if (jobValues.length === 1 && !/^[A-Z]\d{6}$/.test(jobValues[0])) throw new AssistantInputError("Invalid Job number");
-  return { session, query: queryValues[0]?.trim(), jobNumber: jobValues[0] };
+  if (purposeValues.length > 1 || (purposeValues.length === 1 && (purposeValues[0].trim().length === 0 || purposeValues[0].length > 500))) {
+    throw new AssistantInputError("Invalid email purpose");
+  }
+  if (purposeValues.length === 1 && jobValues.length !== 1) throw new AssistantInputError("Email draft requires one Job");
+  return {
+    session,
+    query: queryValues[0]?.trim(),
+    jobNumber: jobValues[0],
+    emailPurpose: purposeValues[0]?.trim(),
+    message: undefined,
+  };
 }
 
 export async function POST(request: Request) {
@@ -70,6 +116,25 @@ export async function POST(request: Request) {
 
     const form = await readForm(request);
     const identity = await verifyAssistantSession(form.session, config.sessionSigningSecret);
+    const actionUrl = new URL("/assistant", config.appBaseUrl);
+    const consumeRateSlot = async (action: "request" | "search" | "summary" | "draft") => {
+      const limit = assistantRateLimit(identity, action);
+      for (const hash of limit.hashes) {
+        if (await consumeEventHash(hash, limit.expiresAt)) return null;
+      }
+      return limit;
+    };
+    const requestLimit = await consumeRateSlot("request");
+    if (requestLimit) {
+      return html(
+        renderProofMessage(
+          "Please wait",
+          `The bounded assistant is busy. Wait ${requestLimit.retryAfterSeconds} seconds, then reopen it from ServiceM8.`,
+        ),
+        429,
+        { "Retry-After": String(requestLimit.retryAfterSeconds) },
+      );
+    }
     if (!(await consumeEventHash(
       assistantSessionHash(form.session),
       new Date(Date.now() + 31 * 60 * 1000),
@@ -77,11 +142,62 @@ export async function POST(request: Request) {
       return html(renderProofMessage("Session already used", "Reopen the Office Assistant from ServiceM8."), 409);
     }
 
-    const takeRateLimit = async (action: "search" | "summary") => {
-      const limit = assistantRateLimit(identity, action);
-      if (!(await consumeEventHash(limit.hash, limit.expiresAt))) throw new AssistantRateLimitError();
+    if (form.restart) {
+      const nextSession = await issueAssistantSession(identity, config.sessionSigningSecret, new Date(), identity.launchExpiresAt);
+      return html(renderConversationAssistant("there", actionUrl, nextSession));
+    }
+
+    const conversationIntent = form.message ? parseConversationMessage(form.message) : null;
+    if (conversationIntent?.kind === "guidance" || conversationIntent?.kind === "draft") {
+      const nextSession = await issueAssistantSession(
+        identity,
+        config.sessionSigningSecret,
+        new Date(),
+        identity.launchExpiresAt,
+      );
+      if (conversationIntent.kind === "draft") {
+        return html(renderConversationDraftPrompt(
+          form.message!,
+          conversationIntent.jobNumber,
+          actionUrl,
+          nextSession,
+        ));
+      }
+      return html(renderConversationGuidance(
+        form.message!,
+        conversationIntent.message,
+        actionUrl,
+        nextSession,
+      ));
+    }
+    const requestedJobNumber = conversationIntent?.kind === "history"
+      ? conversationIntent.jobNumber
+      : form.jobNumber;
+
+    const takeRateLimit = async (action: "search" | "summary" | "draft") => {
+      const limit = await consumeRateSlot(action);
+      if (!limit) return null;
+      const retrySession = await issueAssistantSession(
+        identity,
+        config.sessionSigningSecret,
+        new Date(),
+        identity.launchExpiresAt,
+      );
+      return html(
+        renderProofMessage(
+          "Please wait",
+          `The bounded proof is busy. Wait ${limit.retryAfterSeconds} seconds and try again.`,
+          actionUrl,
+          retrySession,
+        ),
+        429,
+        { "Retry-After": String(limit.retryAfterSeconds) },
+      );
     };
-    await takeRateLimit(form.jobNumber ? "summary" : "search");
+    const initialRateLimit = await takeRateLimit(
+      form.emailPurpose ? "draft" : requestedJobNumber ? "summary" : "search",
+    );
+    if (initialRateLimit) return initialRateLimit;
 
     const logContext = {
       requestId,
@@ -96,8 +212,11 @@ export async function POST(request: Request) {
         apiKey: config.assistantProof.apiKey,
         model: config.assistantProof.model,
       }),
+      drafter: createOpenAIEmailDrafter({
+        apiKey: config.assistantProof.apiKey,
+        model: config.assistantProof.model,
+      }),
     });
-    const actionUrl = new URL("/assistant", config.appBaseUrl);
     const nextSession = await issueAssistantSession(
       identity,
       config.sessionSigningSecret,
@@ -105,39 +224,59 @@ export async function POST(request: Request) {
       identity.launchExpiresAt,
     );
 
-    if (form.jobNumber) {
-      const answer = await proof.answerWhatHappened(form.jobNumber);
-      safeLog("info", "Completed allowlisted Job history proof", logContext);
+    if (form.jobNumber && form.emailPurpose) {
+      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose);
+      safeLog("info", "Completed selected Job email draft proof", logContext);
+      return html(renderEmailDraft(result, actionUrl, nextSession));
+    }
+
+    if (requestedJobNumber) {
+      let answer;
+      try {
+        answer = await proof.answerWhatHappened(requestedJobNumber);
+      } catch (error) {
+        if (error instanceof ProofResolutionError && conversationIntent?.kind === "history") {
+          return html(renderConversationGuidance(
+            form.message!,
+            `I couldn’t find one clear match for Job ${requestedJobNumber}. Check the Job number and try again.`,
+            actionUrl,
+            nextSession,
+          ));
+        }
+        throw error;
+      }
+      safeLog("info", "Completed selected Job history proof", logContext);
+      if (conversationIntent?.kind === "history") {
+        return html(renderConversationProofAnswer(form.message!, answer, actionUrl, nextSession));
+      }
       return html(renderProofAnswer(answer, actionUrl, nextSession));
     }
 
     const matches = await proof.searchJobs(form.query!);
     if (matches.length === 0) {
       return html(renderProofMessage(
-        "No approved Job matched",
-        "Try a more specific address or one of the approved Job numbers.",
+        "No Job matched",
+        "Try a more specific address or Job number.",
         actionUrl,
         nextSession,
       ), 404);
     }
     if (matches.length > 1) return html(renderJobMatches(matches, actionUrl, nextSession));
 
-    await takeRateLimit("summary");
+    const summaryRateLimit = await takeRateLimit("summary");
+    if (summaryRateLimit) return summaryRateLimit;
     const answer = await proof.answerWhatHappened(matches[0].jobNumber);
-    safeLog("info", "Completed allowlisted Job history proof", logContext);
+    safeLog("info", "Completed selected Job history proof", logContext);
     return html(renderProofAnswer(answer, actionUrl, nextSession));
   } catch (error) {
     if (error instanceof AssistantInputError) {
-      return html(renderProofMessage("Request rejected", "Enter one approved Job address or Job number."), 400);
+      return html(renderProofMessage("Request rejected", "Enter one Job address or Job number."), 400);
     }
-    if (error instanceof AssistantRateLimitError) {
-      return html(renderProofMessage("Please wait", "The bounded proof is rate limited. Reopen it from ServiceM8 and try again shortly."), 429);
-    }
-    if (error instanceof ProofAuthorizationError) {
-      return html(renderProofMessage("Job not approved", "That Job is outside this bounded proof."), 403);
+    if (error instanceof ProofSearchTooBroadError) {
+      return html(renderProofMessage("More detail needed", "Enter a more specific Job address or Job number."), 400);
     }
     if (error instanceof ProofResolutionError) {
-      return html(renderProofMessage("Job not found", "The approved Job could not be resolved uniquely."), 404);
+      return html(renderProofMessage("Job not found", "The selected Job could not be resolved uniquely."), 404);
     }
     if (error instanceof ServiceM8ApiError) {
       safeLog("warn", "ServiceM8 assistant proof failed closed", { requestId, status: error.status });
@@ -147,6 +286,10 @@ export async function POST(request: Request) {
     if (error instanceof OpenAIProofError) {
       safeLog("warn", "OpenAI assistant proof failed closed", { requestId, status: error.status });
       return html(renderProofMessage("Unable to summarise this Job", "No AI answer was accepted. Try again later."), 502);
+    }
+    if (error instanceof OpenAIEmailDraftError) {
+      safeLog("warn", "OpenAI email draft proof failed closed", { requestId, status: error.status });
+      return html(renderProofMessage("Unable to draft this email", "No email draft was accepted. Nothing was sent."), 502);
     }
     if (error instanceof Error && error.message === "Assistant session is invalid") {
       return html(renderProofMessage("Session expired", "Reopen the Office Assistant from ServiceM8."), 401);

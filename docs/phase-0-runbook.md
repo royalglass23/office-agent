@@ -83,12 +83,11 @@ Phase 1 source is enabled, confirm independent Michael and Carla global sessions
 binding on every request, and fail-closed behavior for invalid, expired, replayed, or cross-account
 launches.
 
-The owner will supply the exact production test Job cards for the first proof. Treat that list as
-an allowlist for testing: do not browse, sample, or read any unrelated production Job. Before note
-text is sent to an AI provider, separately confirm that the supplied content is safe for that use
-and that the provider/privacy gate has been satisfied.
+The owner initially supplied the following production Job cards as the acceptance-test set. They
+remain the repeatable Michael/Carla test set, but they are no longer an application access
+allowlist.
 
-Approved production test Job references supplied on 13 October 2026:
+Production acceptance-test Job references supplied on 13 October 2026:
 
 - `R260766`
 - `R260680`
@@ -96,28 +95,78 @@ Approved production test Job references supplied on 13 October 2026:
 - `R260270`
 - `R260208`
 
-This list authorises only the bounded read-only proof. It does not authorise ServiceM8 writes,
-outbound messages, or sending the records to an AI provider without the separate confirmation
-above.
-
-The owner confirmed on 13 October 2026 that the customer fields and diary-note text for all five
-allowlisted Job cards are safe to send to OpenAI's API for this proof. This consent is limited to
-these Job references and this read-only “What happened?” workflow; it does not extend to other
-Jobs, new data sources, providers, write actions, or future features. The specific OpenAI model is
-deployment configuration and must be recorded with the test evidence.
+The owner confirmed on 13 October 2026 that the five-Job access restriction should be removed. The
+application may search account-wide Jobs and send bounded core/customer fields and diary-note text
+from the staff-selected Job to OpenAI only for the read-only “What happened?” workflow or the
+review-only Email Draft proof. This does not authorise new data sources, providers, write actions,
+outbound actions, or future features. The specific OpenAI model is deployment configuration and
+must be recorded with the test evidence.
 
 ## Bounded “What happened?” implementation candidate
 
 The local candidate now implements the ADR-0001/ADR-0002 proof behind
 `ASSISTANT_PROOF_ENABLED=false` by default. It uses a fresh global-menu launch to mint a signed,
 30-minute staff-bound session; each submitted form token is one-time, and database-backed search
-and summary buckets rate-limit repeated work. It reads only the allowlisted Job numbers, repeats the
-parent Job read before customer/Note access, sends the signed staff UUID on every ServiceM8 read,
-and requests a non-stored strict JSON-schema response from the configured OpenAI model. The model
-returns only up to three authorised evidence IDs; server code constructs all displayed summary and
-timeline text from the corresponding normalised ServiceM8 evidence.
+and summary buckets rate-limit repeated work. It searches Jobs under the signed staff identity,
+repeats the selected parent Job read before customer/Note access, sends the signed staff UUID on
+every ServiceM8 read, and requests a non-stored strict JSON-schema response from the configured
+OpenAI model. The model returns only up to three authorised evidence IDs; server code constructs
+all displayed summary and timeline text from the corresponding normalised ServiceM8 evidence.
 
-This is local implementation evidence only. Before a production proof:
+On 13 October 2026, the owner reported that all five supplied Job-number checks worked in
+independent Michael and Carla sessions, with correct staff separation and no ServiceM8 writes or
+outbound messages. Address search remains a known deferred defect: unrelated legacy Jobs with an
+empty Company UUID can abort the account-wide scan. The accepted proof therefore covers exact Job
+number selection only and must not be represented as working natural-language address search.
+
+After that acceptance, the owner explicitly authorised a second bounded outcome: staff may enter
+an email purpose for the Selected Job and receive a review-only subject/body draft from the same
+core Job/customer fields and Job diary notes. The assistant must not send or save the draft, and
+must continue to disclose excluded sources. OpenAI selects only authorised evidence IDs for this
+outcome; server code constructs the displayed subject and body from the normalised staff purpose
+and selected-Job data, so model-authored claims are never displayed.
+
+## Phase 0 gate record — 13 October 2026
+
+```text
+Gate ID: PHASE-0-TO-PHASE-1
+Current stage: Phase 0
+Candidate next stage: Phase 1 global Add-ons-menu assistant
+Required evidence: Independent Michael and Carla live sessions; correct staff/session separation;
+  bounded What happened and review-only Email Draft results; no ServiceM8 write or outbound action;
+  no mandatory-stop condition triggered.
+Evidence obtained: The owner confirmed the live Michael and Carla checks passed on 13 October 2026.
+  The previously accepted What happened checks and the Email Draft acceptance checks completed
+  successfully within the documented exact-Job-number boundary.
+Unresolved findings: Natural-language address search remains deferred and must not be represented
+  as accepted. No Phase 0 gate blocker remains.
+Gate result: PASS
+User authorised transition: YES
+Authorisation reference: On 13 October 2026 the owner explicitly instructed Codex to reconcile
+  the obsolete Phase 0 security records and start the bounded Phase 1 global Add-ons-menu
+  conversational assistant.
+```
+
+## Authorised Phase 1 boundary — 13 October 2026
+
+Phase 1 starts as a narrow extension of the accepted production proofs, not as a general-purpose
+agent. A fresh Global Launch opens a staff-bound conversation. For this first slice, the staff
+member supplies exactly one Job number and may ask either what happened or for an email draft. The
+existing proof readers continue to use only core Job/customer fields and Job diary notes. Email,
+SMS, forms, attachments, schedule activity, additional providers, persistent transcripts, writes,
+sending, and autonomous actions remain excluded.
+
+The claimless Job Action route remains data-disabled. Natural-language intent is supported, but
+natural-language address search remains deferred because its Phase 0 defect was not accepted. Each
+form submission uses a fresh one-time staff-bound session; unsupported requests and requests with
+zero or several Job numbers stop before ServiceM8 access.
+
+The historical strict-E2E security audit remains `BLOCKED` for claimless Job Actions, isolated
+multi-account/restricted-role claims, and any later expansion. Its former blanket statement that it
+blocks all Phase 1 work is superseded only for this single-account, global-menu, read-only boundary.
+See `security/servicem8-callback-replay/scope-reconciliation.md`.
+
+For a future deployment or repeat of this production proof:
 
 1. verify and record the configured OpenAI API organisation's retention/data-control settings;
 2. configure the exact `OPENAI_MODEL` and record it with the test evidence;
@@ -131,6 +180,7 @@ This is local implementation evidence only. Before a production proof:
 ## Mandatory stop
 
 Report **NO-GO** and do not start Phase 1 if callback freshness is unavailable or untrustworthy,
-account binding differs, Staff B sees any restricted Job data, a child endpoint leaks data, OAuth
-refresh/revocation does not fail closed, the modal requires weakened browser security, or any API
-key, administrator-token fallback, write scope, or ServiceM8 mutation is required.
+account binding differs, an invalid/replayed/cross-account launch sees any Job data, a child
+endpoint leaks data, OAuth refresh/revocation does not fail closed, the modal requires weakened
+browser security, or any ServiceM8 API-key or administrator-token fallback, write scope, or
+ServiceM8 mutation is required.

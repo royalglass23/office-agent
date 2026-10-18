@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { runInNewContext } from "node:vm";
+import { describe, expect, it, vi } from "vitest";
 import {
+  renderConversationDraftPrompt,
   renderJobContext,
   renderJobMatches,
+  renderEmailDraft,
   renderMenuAssistant,
   renderProofAnswer,
   renderProofAssistant,
@@ -21,15 +24,88 @@ describe("renderMenuAssistant", () => {
       "signed-session-token",
     );
     expect(html).toContain('action="https://office.example.test/assistant"');
+    expect(html).toContain("connect-src https://office.example.test");
     expect(html).toContain('name="session" value="signed-session-token"');
     expect(html).toContain('name="query"');
     expect(html).not.toContain("accountUUID");
     expect(html).not.toContain("staffUUID");
   });
+
+  it("submits without a browser POST history entry and blocks a second submission", async () => {
+    const html = renderProofAssistant(
+      "May",
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+    const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
+    expect(script).toBeDefined();
+
+    let submitHandler: ((event: { target: unknown; preventDefault: () => void }) => Promise<void>) | undefined;
+    const button = { disabled: false, textContent: "What happened?", dataset: { pendingLabel: "Checking…" } };
+    class HTMLFormElement {
+      action = "https://office.example.test/assistant";
+      method = "post";
+      dataset = { submitted: "false" };
+      querySelectorAll() { return [button]; }
+    }
+    const form = new HTMLFormElement();
+    const document = { addEventListener: (_type: string, handler: typeof submitHandler) => { submitHandler = handler; }, documentElement: { innerHTML: "" } };
+    const fetcher = vi.fn(async () => ({ text: async () => "<html>Next conversation</html>" }));
+    const DOMParser = class { parseFromString() { return { documentElement: { innerHTML: "<head></head><body>Next conversation</body>" } }; } };
+    runInNewContext(script!, { document, fetch: fetcher, FormData: class { constructor() {} }, URL, URLSearchParams, DOMParser, HTMLFormElement, location: { origin: "https://office.example.test" } });
+
+    const firstSubmission = { target: form, preventDefault: vi.fn() };
+    const pending = submitHandler!(firstSubmission);
+    expect(firstSubmission.preventDefault).toHaveBeenCalledOnce();
+    expect(button).toMatchObject({ disabled: true, textContent: "Checking…" });
+
+    const secondSubmission = { target: form, preventDefault: vi.fn() };
+    submitHandler!(secondSubmission);
+    expect(secondSubmission.preventDefault).toHaveBeenCalledOnce();
+    await pending;
+    expect(fetcher).toHaveBeenCalledWith("https://office.example.test/assistant", expect.objectContaining({ method: "POST" }));
+    expect(document.documentElement.innerHTML).toContain("Next conversation");
+  });
+
+  it("submits the first ServiceM8 iframe form without leaving a POST history entry", async () => {
+    const html = renderProofAssistant("May", new URL("https://office.example.test/assistant"), "signed-session-token");
+    const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
+    let handler: ((event: { target: unknown; preventDefault: () => void }) => Promise<void>) | undefined;
+    class HTMLFormElement {
+      action = "https://office.example.test/assistant";
+      method = "post";
+      dataset = { submitted: "false" };
+      querySelectorAll() { return [{ disabled: false, textContent: "Send", dataset: {} }]; }
+    }
+    const fetcher = vi.fn(async () => ({ text: async () => "<html>Next conversation</html>" }));
+    runInNewContext(script!, {
+      document: { addEventListener: (_type: string, callback: typeof handler) => { handler = callback; }, documentElement: { innerHTML: "" } },
+      HTMLFormElement, URL, URLSearchParams, FormData: class { constructor() {} },
+      DOMParser: class { parseFromString() { return { documentElement: { innerHTML: "<body>Next conversation</body>" } }; } },
+      location: { origin: "https://app.servicem8.com" }, fetch: fetcher,
+    });
+    const event = { target: new HTMLFormElement(), preventDefault: vi.fn() };
+    await handler!(event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledWith("https://office.example.test/assistant", expect.objectContaining({ method: "POST", credentials: "omit" }));
+  });
 });
 
 describe("proof result rendering", () => {
-  it("requires explicit selection when several approved Jobs match", () => {
+  it("escapes conversational staff text before rendering a draft prompt", () => {
+    const html = renderConversationDraftPrompt(
+      '<script>alert("message")</script> Draft an email for R260766',
+      "R260766",
+      new URL("https://office.example.test/assistant"),
+      "signed-session-token",
+    );
+
+    expect(html).toContain('&lt;script&gt;alert(&quot;message&quot;)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert("message")</script>');
+    expect(html).toContain("Nothing will be sent");
+  });
+
+  it("requires explicit selection when several Jobs match", () => {
     const html = renderJobMatches(
       [
         { jobNumber: "R260766", address: "10 Queen Street", status: "Quote" },
@@ -39,8 +115,9 @@ describe("proof result rendering", () => {
       "signed-session-token",
     );
     expect(html).toContain("Choose the Job");
-    expect(html).toContain('name="jobNumber" value="R260766"');
-    expect(html).toContain('name="jobNumber" value="R260680"');
+    expect(html).toContain('<input type="hidden" name="jobNumber" value="R260766">');
+    expect(html).toContain('<input type="hidden" name="jobNumber" value="R260680">');
+    expect(html).not.toContain('<button class="match" type="submit" name="jobNumber"');
   });
 
   it("escapes model text and discloses the bounded source coverage", () => {
@@ -60,6 +137,39 @@ describe("proof result rendering", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
+    expect(html).toContain('name="emailPurpose"');
+    expect(html).toContain('value="R260766"');
+    expect(html).toContain("Draft email");
+    expect(html).toContain("Nothing will be sent");
+  });
+
+  it("renders an escaped review-only email draft with no send action", () => {
+    const html = renderEmailDraft({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Follow up on the measure",
+      draft: {
+        subject: "<script>alert('subject')</script>",
+        body: "Hi Example,\n<script>alert('body')</script>",
+        citations: ["job:record", "note:1"],
+      },
+      coverage: {
+        included: ["core Job/customer fields", "Job diary notes"],
+        excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
+        noteCount: 1,
+        truncated: false,
+        snapshotAt: "2026-10-13T00:00:00.000Z",
+      },
+    }, new URL("https://office.example.test/assistant"), "signed-session-token");
+
+    expect(html).toContain("Email draft — R260766");
+    expect(html).toContain("Draft only — nothing was sent");
+    expect(html).toContain("&lt;script&gt;alert(&#39;subject&#39;)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(&#39;body&#39;)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert('body')</script>");
+    expect(html).not.toContain("Send email");
+    expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
+    expect(html).toContain('name="message"');
+    expect(html).toContain("Ask another question");
   });
 });
 

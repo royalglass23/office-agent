@@ -13,6 +13,7 @@ beforeEach(() => {
     SERVICEM8_APP_SECRET: "app-secret-with-enough-length",
     SERVICEM8_OAUTH_REDIRECT_URI: "https://office-agent-ashy.vercel.app/api/servicem8/oauth/callback",
     SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff",
+    SERVICEM8_ALLOWED_ACCOUNT_UUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     DATABASE_URL: "postgres://unused",
     TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
     SESSION_SIGNING_SECRET: "session-secret-with-at-least-thirty-two-bytes",
@@ -37,5 +38,20 @@ describe("ServiceM8 add-on manifest", () => {
       },
     ]);
     expect(served.menuItems).toEqual(manifest.menuItems);
+  });
+
+  it("labels the staging deployment distinctly while keeping the same bounded capabilities", async () => {
+    process.env.APP_BASE_URL = "https://office-agent-staging.vercel.app";
+    process.env.SERVICEM8_OAUTH_REDIRECT_URI = "https://office-agent-staging.vercel.app/api/servicem8/oauth/callback";
+    resetConfigForTests();
+
+    const served = await GET().json();
+    expect(served).toMatchObject({
+      name: "RG Office Assistant Staging",
+      version: "0.2.0",
+      oauth: { scope: "vendor read_jobs read_customers read_job_notes read_staff" },
+      actions: [],
+      menuItems: [{ name: "RG Office Assistant Staging", event: "rg_office_assistant_menu" }],
+    });
   });
 });

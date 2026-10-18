@@ -24,16 +24,17 @@ Office Assistant sign-in is required for the initial global flow.
 ## Consequences
 
 - The user must identify a Job after opening the assistant globally.
-- Staff may describe the Job naturally by address or provide its Job number. Address is the normal
-  reference; Job number is also supported.
+- Staff may eventually describe the Job naturally by address or provide its Job number. The first
+  Phase 1 slice requires one exact Job number; address search remains deferred until its known scan
+  failure is fixed and accepted.
 - A single authorised match may become the Selected Job directly. Multiple matches must be shown
   for explicit staff selection; the assistant must not guess from similar addresses or customers.
 - The first proof is intentionally smaller than the planned first release: find and explicitly
   select a Job, then produce a read-only account of what happened from the Initial Job Context.
 - The provisional Proof Answer is a short plain-English summary followed by a dated evidence
   timeline. This is a testable presentation choice, not a permanent answer format.
-- Email Drafts and Suggested Next Actions are deferred until that proof works reliably. The Office
-  Assistant does not send email or mutate ServiceM8.
+- Review-only Email Drafts are now an accepted capability. Suggested Next Actions remain deferred.
+  The Office Assistant does not send email or mutate ServiceM8.
 - The first release's Initial Job Context is deliberately limited to core Selected Job and customer
   fields plus Job diary notes.
 - Responses must disclose that email, SMS, forms, attachments, and schedule activity are excluded.
@@ -48,8 +49,7 @@ Office Assistant sign-in is required for the initial global flow.
   correct staff identity, and must not share conversation state.
 - Negative access tests apply to invalid, expired, replayed, or cross-account launches—not to an
   invented Michael-versus-Carla per-Job restriction.
-- Production proof access is limited to the specific test Job cards supplied by the owner. No
-  unrelated Job may be opened, sampled, or used to evaluate the assistant.
-- The owner has approved sending the allowlisted test Jobs' customer fields and diary-note text to
-  OpenAI's API for this proof only. The model is deployment configuration. Adding another Job,
-  source, provider, or purpose requires a new scope decision.
+- Staff may search any Job readable in the connected Royal Glass ServiceM8 account. Only the Job
+  they deliberately select may provide customer fields and diary-note text to OpenAI for the
+  read-only proof. The model is deployment configuration. Adding another source, provider,
+  purpose, write action, or outbound action requires a new scope decision.

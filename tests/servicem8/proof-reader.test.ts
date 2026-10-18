@@ -33,6 +33,30 @@ describe("ServiceM8 proof reader", () => {
     }]);
   });
 
+  it("maps a paginated Job search page without losing its cursor", async () => {
+    const nextCursor = "8af9e876-4d24-4db1-8c38-e984874872e8";
+    const client = {
+      listJobsPage: vi.fn(async () => ({
+        records: [{
+          uuid: jobUUID,
+          company_uuid: companyUUID,
+          generated_job_id: "R999999",
+          job_address: "99 New Street",
+          status: "Quote",
+          job_description: "Replace glass",
+          work_done_description: "",
+          date: "2026-10-01T00:00:00Z",
+        }],
+        nextCursor,
+      })),
+    } as unknown as ServiceM8Client;
+
+    await expect(new ServiceM8ProofReader(client).listJobsPage(null)).resolves.toEqual({
+      jobs: [expect.objectContaining({ jobNumber: "R999999", address: "99 New Street" })],
+      nextCursor,
+    });
+  });
+
   it("excludes inactive notes while preserving the verified pagination cursor", async () => {
     const nextCursor = "8af9e876-4d24-4db1-8c38-e984874872e8";
     const client = {
