@@ -62,18 +62,19 @@ export async function POST(request: Request) {
     }
 
     if (verified.event.eventName === "rg_office_assistant_menu") {
-      const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);
-      await requireVendorAccount(client, verified.event.auth.accountUUID);
-      const staff = await client.getStaff(verified.event.auth.staffUUID);
-      safeLog("info", "Completed named global menu launch", identifiers);
       if (config.assistantProof.enabled) {
         const session = await issueAssistantSession(verified.event.auth, config.sessionSigningSecret);
+        safeLog("info", "Completed global menu launch", identifiers);
         return addonResponse(renderConversationAssistant(
-          staff.first,
+          null,
           new URL("/assistant", config.appBaseUrl),
           session,
         ));
       }
+      const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);
+      await requireVendorAccount(client, verified.event.auth.accountUUID);
+      const staff = await client.getStaff(verified.event.auth.staffUUID);
+      safeLog("info", "Completed named global menu launch", identifiers);
       return addonResponse(renderMenuAssistant(staff.first));
     }
 
