@@ -5,6 +5,7 @@ import {
   renderConversationAssistant,
   renderJobContext,
   renderJobMatches,
+  renderJobAdvice,
   renderEmailDraft,
   renderMenuAssistant,
   renderProofAnswer,
@@ -19,6 +20,8 @@ describe("renderMenuAssistant", () => {
       "signed-session-token",
       "signed-greeting-token",
     );
+    expect(html).toContain("Job Diary coverage incomplete");
+    expect(html).toContain("Job summaries, email drafts and recommendations are unavailable");
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
     expect(script).toBeDefined();
     const greeting = { textContent: "Opening RG Office Assistant…" };
@@ -134,7 +137,7 @@ describe("proof result rendering", () => {
 
     expect(html).toContain('&lt;script&gt;alert(&quot;message&quot;)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert("message")</script>');
-    expect(html).toContain("Nothing will be sent");
+    expect(html).toContain("Nothing is sent");
   });
 
   it("requires explicit selection when several Jobs match", () => {
@@ -169,21 +172,25 @@ describe("proof result rendering", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
-    expect(html).toContain('name="emailPurpose"');
+    expect(html).toContain('name="jobAdvice" value="recommend"');
+    expect(html).toContain('name="jobAdvice" value="email"');
+    expect(html).not.toContain('name="emailRecipient"');
     expect(html).toContain('value="R260766"');
-    expect(html).toContain("Draft email");
-    expect(html).toContain("Nothing will be sent");
+    expect(html).toContain("Suggest next step and draft email");
+    expect(html).toContain("Nothing is sent");
   });
 
   it("renders an escaped review-only email draft with no send action", () => {
     const html = renderEmailDraft({
       job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
       purpose: "Follow up on the measure",
+      recipient: "builder",
       draft: {
         subject: "<script>alert('subject')</script>",
         body: "Hi Example,\n<script>alert('body')</script>",
         citations: ["job:record", "note:1"],
       },
+      sources: [{ id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Measure <pending>" }],
       coverage: {
         included: ["core Job/customer fields", "Job diary notes"],
         excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
@@ -199,9 +206,38 @@ describe("proof result rendering", () => {
     expect(html).toContain("&lt;script&gt;alert(&#39;body&#39;)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert('body')</script>");
     expect(html).not.toContain("Send email");
+    expect(html).toContain('id="draftSubject"');
+    expect(html).toContain('id="draftBody"');
+    expect(html).toContain('name="emailRevision"');
+    expect(html).toContain("Revise draft");
+    expect(html).toContain('name="emailRecipient" value="builder"');
+    expect(html).toContain("Measure &lt;pending&gt;");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
     expect(html).toContain('name="message"');
     expect(html).toContain("Ask another question");
+  });
+
+  it("shows a sourced next action and adds an editable draft only when requested", () => {
+    const result = {
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Confirm <site> timing.", suggestedContact: "builder",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site <pending>" }, quote: "Site <pending>" },
+      draft: null as null | { subject: string; body: string; citations: string[] },
+      coverage: { included: ["core Job/customer fields", "Job diary notes"], excluded: ["email", "SMS", "attachments"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    };
+    const actionUrl = new URL("https://office.example.test/assistant");
+    const recommendation = renderJobAdvice(result, actionUrl, "session-token");
+    expect(recommendation).toContain("Confirm &lt;site&gt; timing.");
+    expect(recommendation).toContain("Site &lt;pending&gt;");
+    expect(recommendation).not.toContain("<site>");
+    expect(recommendation).not.toContain("Review-only email draft");
+    expect(recommendation).toContain("Not checked: email, SMS, attachments");
+
+    const withEmail = renderJobAdvice({ ...result, draft: { subject: "Job follow-up", body: "Could you confirm timing?", citations: ["note:1"] } }, actionUrl, "session-token");
+    expect(withEmail).toContain("Review-only email draft");
+    expect(withEmail).toContain('id="draftBody"');
+    expect(withEmail).toContain("Suggested contact: builder");
+    expect(withEmail).not.toContain("Send email");
   });
 });
 

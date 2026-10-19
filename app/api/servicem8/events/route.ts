@@ -3,6 +3,7 @@ import { issueAssistantGreetingSession, issueAssistantSession } from "@/lib/secu
 import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import { loadPhaseZeroJobContext } from "@/lib/servicem8/job-context";
+import { isJobDiaryCoverageVerified } from "@/lib/servicem8/job-diary-gate";
 import {
   renderError,
   renderConversationAssistant,
@@ -80,6 +81,13 @@ export async function POST(request: Request) {
       const staff = await client.getStaff(verified.event.auth.staffUUID);
       safeLog("info", "Completed named global menu launch", identifiers);
       return addonResponse(renderMenuAssistant(staff.first));
+    }
+
+    if (!isJobDiaryCoverageVerified()) {
+      return addonResponse(renderError(
+        "Job Diary coverage incomplete",
+        "Job details are unavailable until the full Diary read is verified. Review this Job in ServiceM8.",
+      ), 503);
     }
 
     const client = new ServiceM8Client(verified.event.auth.accountUUID, verified.event.auth.staffUUID);

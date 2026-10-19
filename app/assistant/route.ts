@@ -1,6 +1,7 @@
 import { getConfig } from "@/lib/config";
 import { parseConversationMessage } from "@/lib/assistant/conversation";
 import { createOpenAIEmailDrafter, OpenAIEmailDraftError } from "@/lib/openai/email-drafter";
+import { createOpenAIJobAdvisor, OpenAIJobAdviceError } from "@/lib/openai/job-advisor";
 import { createOpenAIProofSummarizer, OpenAIProofError } from "@/lib/openai/proof-summarizer";
 import {
   assistantRateLimit,
@@ -12,13 +13,21 @@ import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-lo
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import {
   createOfficeAssistantProof,
+  emailRecipients,
+  emailRevisions,
+  ProofEmailSuggestionError,
+  ProofGoalClarificationError,
+  ProofJobAdviceError,
   ProofResolutionError,
   ProofSearchTooBroadError,
+  validateEmailGoal,
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
+import { isJobDiaryCoverageVerified, jobDiaryGateMessage } from "@/lib/servicem8/job-diary-gate";
 import {
   renderEmailDraft,
   renderJobMatches,
+  renderJobAdvice,
   renderConversationDraftPrompt,
   renderConversationGuidance,
   renderConversationProofAnswer,
@@ -75,21 +84,29 @@ async function readForm(request: Request) {
     if (restartValues.length !== 1 || restartValues[0] !== "1" || form.size !== 2) {
       throw new AssistantInputError("Invalid restart request");
     }
-    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, emailPurpose: undefined };
+    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, contextJobNumber: undefined, emailPurpose: undefined, emailRecipient: undefined, emailRevision: undefined, jobAdvice: undefined };
   }
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
+  const contextJobValues = form.getAll("contextJobNumber");
   const purposeValues = form.getAll("emailPurpose");
+  const recipientValues = form.getAll("emailRecipient");
+  const revisionValues = form.getAll("emailRevision");
+  const adviceValues = form.getAll("jobAdvice");
   const messageValues = form.getAll("message").filter((value) => value.trim().length > 0);
   if (messageValues.length > 1 || (messageValues.length === 1 && messageValues[0].length > 500)) {
     throw new AssistantInputError("Invalid message");
   }
+  if (contextJobValues.length > 1 || (contextJobValues.length === 1 && !/^[A-Z]\d{6}$/.test(contextJobValues[0]))) {
+    throw new AssistantInputError("Invalid selected Job context");
+  }
   if (messageValues.length === 1) {
-    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0) {
+    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0 || recipientValues.length > 0 || revisionValues.length > 0 || adviceValues.length > 0) {
       throw new AssistantInputError("Choose a message or one proof action");
     }
-    return { session, message: messageValues[0].trim() };
+    return { session, message: messageValues[0].trim(), contextJobNumber: contextJobValues[0] };
   }
+  if (contextJobValues.length > 0) throw new AssistantInputError("Selected Job context requires a message");
   if (queryValues.length + jobValues.length !== 1) throw new AssistantInputError("Choose a search or one Job");
   if (queryValues.length === 1 && queryValues[0].length > 200) throw new AssistantInputError("Search is too long");
   if (jobValues.length === 1 && !/^[A-Z]\d{6}$/.test(jobValues[0])) throw new AssistantInputError("Invalid Job number");
@@ -97,11 +114,28 @@ async function readForm(request: Request) {
     throw new AssistantInputError("Invalid email purpose");
   }
   if (purposeValues.length === 1 && jobValues.length !== 1) throw new AssistantInputError("Email draft requires one Job");
+  if (adviceValues.length > 1 || (adviceValues.length === 1 &&
+      (jobValues.length !== 1 || !["recommend", "email"].includes(adviceValues[0]) ||
+       purposeValues.length > 0 || recipientValues.length > 0 || revisionValues.length > 0))) {
+    throw new AssistantInputError("Invalid Job advice request");
+  }
+  if (purposeValues.length === 1 && (recipientValues.length !== 1 || !emailRecipients.includes(recipientValues[0] as typeof emailRecipients[number]))) {
+    throw new AssistantInputError("Choose an email recipient");
+  }
+  if (purposeValues.length === 0 && recipientValues.length > 0) throw new AssistantInputError("Email recipient requires a draft");
+  if (revisionValues.length > 1 || (revisionValues.length === 1 && !emailRevisions.includes(revisionValues[0] as typeof emailRevisions[number]))) {
+    throw new AssistantInputError("Invalid email revision");
+  }
+  if (revisionValues.length === 1 && purposeValues.length !== 1) throw new AssistantInputError("Email revision requires a draft");
   return {
     session,
     query: queryValues[0]?.trim(),
     jobNumber: jobValues[0],
+    contextJobNumber: undefined,
     emailPurpose: purposeValues[0]?.trim(),
+    emailRecipient: recipientValues[0] as typeof emailRecipients[number] | undefined,
+    emailRevision: revisionValues[0] as typeof emailRevisions[number] | undefined,
+    jobAdvice: adviceValues[0] as "recommend" | "email" | undefined,
     message: undefined,
   };
 }
@@ -150,32 +184,32 @@ export async function POST(request: Request) {
       return html(renderConversationAssistant(staff.first, actionUrl, nextSession));
     }
 
-    const conversationIntent = form.message ? parseConversationMessage(form.message) : null;
-    if (conversationIntent?.kind === "guidance" || conversationIntent?.kind === "draft") {
+    const conversationIntent = form.message ? parseConversationMessage(form.message, form.contextJobNumber) : null;
+    if (conversationIntent?.kind === "guidance") {
       const nextSession = await issueAssistantSession(
         identity,
         config.sessionSigningSecret,
         new Date(),
         identity.launchExpiresAt,
       );
-      if (conversationIntent.kind === "draft") {
-        return html(renderConversationDraftPrompt(
-          form.message!,
-          conversationIntent.jobNumber,
-          actionUrl,
-          nextSession,
-        ));
-      }
       return html(renderConversationGuidance(
         form.message!,
         conversationIntent.message,
         actionUrl,
         nextSession,
+        form.contextJobNumber,
       ));
     }
-    const requestedJobNumber = conversationIntent?.kind === "history"
+    const requestedJobNumber = conversationIntent
       ? conversationIntent.jobNumber
       : form.jobNumber;
+
+    if (requestedJobNumber && !isJobDiaryCoverageVerified()) {
+      const nextSession = await issueAssistantSession(
+        identity, config.sessionSigningSecret, new Date(), identity.launchExpiresAt,
+      );
+      return html(renderProofMessage("Job Diary coverage incomplete", jobDiaryGateMessage, actionUrl, nextSession), 503);
+    }
 
     const takeRateLimit = async (action: "search" | "summary" | "draft") => {
       const limit = await consumeRateSlot(action);
@@ -198,9 +232,31 @@ export async function POST(request: Request) {
       );
     };
     const initialRateLimit = await takeRateLimit(
-      form.emailPurpose ? "draft" : requestedJobNumber ? "summary" : "search",
+      form.emailPurpose || form.jobAdvice || conversationIntent?.kind === "recommend" || conversationIntent?.kind === "draft"
+        ? "draft" : requestedJobNumber ? "summary" : "search",
     );
     if (initialRateLimit) return initialRateLimit;
+
+    if (form.emailPurpose && form.emailRecipient) {
+      try {
+        validateEmailGoal(form.emailPurpose, form.emailRecipient);
+      } catch (error) {
+        if (!(error instanceof ProofGoalClarificationError)) throw error;
+        const clarificationSession = await issueAssistantSession(
+          identity,
+          config.sessionSigningSecret,
+          new Date(),
+          identity.launchExpiresAt,
+        );
+        return html(renderConversationDraftPrompt(
+          form.emailPurpose,
+          form.jobNumber!,
+          actionUrl,
+          clarificationSession,
+          "What exact question should this email ask? Please include it in the goal below.",
+        ));
+      }
+    }
 
     const logContext = {
       requestId,
@@ -219,6 +275,10 @@ export async function POST(request: Request) {
         apiKey: config.assistantProof.apiKey,
         model: config.assistantProof.model,
       }),
+      advisor: createOpenAIJobAdvisor({
+        apiKey: config.assistantProof.apiKey,
+        model: config.assistantProof.model,
+      }),
     });
     const nextSession = await issueAssistantSession(
       identity,
@@ -227,8 +287,29 @@ export async function POST(request: Request) {
       identity.launchExpiresAt,
     );
 
+    const adviceAction = form.jobAdvice ?? (conversationIntent?.kind === "recommend" ? "recommend"
+      : conversationIntent?.kind === "draft" ? "email" : undefined);
+    if (requestedJobNumber && adviceAction) {
+      let result;
+      try {
+        result = await proof.adviseJob(requestedJobNumber, form.message ??
+          (adviceAction === "email" ? "Draft a useful follow-up email" : "What should we do next?"), adviceAction === "email");
+      } catch (error) {
+        if (!(error instanceof ProofGoalClarificationError)) throw error;
+        return html(renderProofMessage("More context needed", error.message, actionUrl, nextSession));
+      }
+      safeLog("info", "Completed selected Job advice", logContext);
+      return html(renderJobAdvice(result, actionUrl, nextSession));
+    }
+
     if (form.jobNumber && form.emailPurpose) {
-      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose);
+      let result;
+      try {
+        result = await proof.draftEmail(form.jobNumber, form.emailPurpose, form.emailRecipient, form.emailRevision);
+      } catch (error) {
+        if (!(error instanceof ProofGoalClarificationError)) throw error;
+        return html(renderConversationDraftPrompt(form.emailPurpose, form.jobNumber, actionUrl, nextSession, error.message));
+      }
       safeLog("info", "Completed selected Job email draft proof", logContext);
       return html(renderEmailDraft(result, actionUrl, nextSession));
     }
@@ -268,6 +349,9 @@ export async function POST(request: Request) {
 
     const summaryRateLimit = await takeRateLimit("summary");
     if (summaryRateLimit) return summaryRateLimit;
+    if (!isJobDiaryCoverageVerified()) {
+      return html(renderProofMessage("Job Diary coverage incomplete", jobDiaryGateMessage, actionUrl, nextSession), 503);
+    }
     const answer = await proof.answerWhatHappened(matches[0].jobNumber);
     safeLog("info", "Completed selected Job history proof", logContext);
     return html(renderProofAnswer(answer, actionUrl, nextSession));
@@ -293,6 +377,14 @@ export async function POST(request: Request) {
     if (error instanceof OpenAIEmailDraftError) {
       safeLog("warn", "OpenAI email draft proof failed closed", { requestId, status: error.status });
       return html(renderProofMessage("Unable to draft this email", "No email draft was accepted. Nothing was sent."), 502);
+    }
+    if (error instanceof OpenAIJobAdviceError || error instanceof ProofJobAdviceError) {
+      safeLog("warn", "Job advice failed evidence checks", { requestId });
+      return html(renderProofMessage("Unable to recommend a next step", "No suggestion was accepted from the checked Job notes. Nothing was sent."), 502);
+    }
+    if (error instanceof ProofEmailSuggestionError) {
+      safeLog("warn", "Email suggestion failed evidence checks", { requestId });
+      return html(renderProofMessage("Unable to draft this email", "The suggested wording could not be supported by the checked Job records. Nothing was sent."), 502);
     }
     if (error instanceof Error && error.message === "Assistant session is invalid") {
       return html(renderProofMessage("Session expired", "Reopen the Office Assistant from ServiceM8."), 401);

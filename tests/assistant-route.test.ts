@@ -9,11 +9,14 @@ const {
   getConfig,
   issueAssistantSession,
   proof,
+  validateEmailGoal,
   requireVendorAccount,
   verifyAssistantSession,
   getStaff,
+  isJobDiaryCoverageVerified,
 } = vi.hoisted(() => {
-  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
+  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn(), adviseJob: vi.fn() };
+  const validateEmailGoal = vi.fn((purpose: string) => purpose);
   return {
     assistantRateLimit: vi.fn((_: unknown, action: "request" | "search" | "summary" | "draft") => ({
       hashes: Array.from(
@@ -34,8 +37,10 @@ const {
     })),
     issueAssistantSession: vi.fn(async () => "next-session-token"),
     proof,
+    validateEmailGoal,
     requireVendorAccount: vi.fn(async () => undefined),
     getStaff: vi.fn(async (staffUUID: string) => ({ first: staffUUID ? "May" : "" })),
+    isJobDiaryCoverageVerified: vi.fn(() => true),
     verifyAssistantSession: vi.fn(async () => ({
       accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
       staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
@@ -51,6 +56,10 @@ vi.mock("@/lib/security/assistant-session", () => ({
   verifyAssistantSession,
 }));
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
+vi.mock("@/lib/servicem8/job-diary-gate", () => ({
+  isJobDiaryCoverageVerified,
+  jobDiaryGateMessage: "No Job summary, email draft, or recommendation was generated",
+}));
 vi.mock("@/lib/security/safe-log", () => ({
   correlationId: () => "request-id",
   redactIdentifier: () => "redacted",
@@ -68,7 +77,13 @@ vi.mock("@/lib/servicem8/proof-reader", () => ({
   ServiceM8ProofReader: class ServiceM8ProofReader {},
 }));
 vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
+  emailRecipients: ["customer", "builder", "supplier", "internal"],
+  emailRevisions: ["shorter", "warmer", "more-formal"],
   createOfficeAssistantProof,
+  ProofGoalClarificationError: class ProofGoalClarificationError extends Error {},
+  ProofEmailSuggestionError: class ProofEmailSuggestionError extends Error {},
+  ProofJobAdviceError: class ProofJobAdviceError extends Error {},
+  validateEmailGoal,
   ProofResolutionError: class ProofResolutionError extends Error {},
   ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
 }));
@@ -76,9 +91,13 @@ vi.mock("@/lib/openai/proof-summarizer", () => ({
   OpenAIProofError: class OpenAIProofError extends Error {},
   createOpenAIProofSummarizer: () => ({ summarize: vi.fn() }),
 }));
+vi.mock("@/lib/openai/job-advisor", () => ({
+  OpenAIJobAdviceError: class OpenAIJobAdviceError extends Error {},
+  createOpenAIJobAdvisor: () => ({ advise: vi.fn() }),
+}));
 
 import { OPTIONS, POST } from "@/app/assistant/route";
-import { ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
+import { ProofEmailSuggestionError, ProofGoalClarificationError, ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -92,6 +111,33 @@ describe("assistant proof route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consumeEventHash.mockResolvedValue(true);
+    isJobDiaryCoverageVerified.mockReturnValue(true);
+  });
+
+  it.each([
+    { jobNumber: "R260766" },
+    { jobNumber: "R260766", emailPurpose: "Ask for a site measure update", emailRecipient: "customer" },
+    { jobNumber: "R260766", jobAdvice: "recommend" },
+    { session: "valid-session", message: "What should we do next for R260766?" },
+  ])("withholds Job output while Diary coverage is unverified: %j", async (fields) => {
+    isJobDiaryCoverageVerified.mockReturnValue(false);
+    const formFields: Record<string, string> = { session: "valid-session" };
+    Object.assign(formFields, fields);
+    const response = await POST(request(formFields));
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(body).toContain("Job Diary coverage incomplete");
+    expect(body).toContain("No Job summary, email draft, or recommendation was generated");
+    expect(createOfficeAssistantProof).not.toHaveBeenCalled();
+  });
+
+  it("withholds an auto-selected search result when Diary coverage is unverified", async () => {
+    isJobDiaryCoverageVerified.mockReturnValue(false);
+    proof.searchJobs.mockResolvedValueOnce([{ jobNumber: "R260766", address: "Test address", status: "Work Order" }]);
+    const response = await POST(request({ session: "valid-session", query: "Test address" }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain("Job Diary coverage incomplete");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid session before ServiceM8 access", async () => {
@@ -374,20 +420,64 @@ describe("assistant proof route", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBeNull();
   });
 
-  it("asks for the purpose before drafting an email from a conversational request", async () => {
+  it("uses the selected Job notes for an explicit conversational email request", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Confirm the current measure position.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: { subject: "10 Queen Street (R260766) – Job follow-up", body: "Could you please confirm the current measure position?", citations: ["job:record", "note:1"] },
+      coverage: { included: ["core Job/customer fields", "Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
     const response = await POST(request({
       session: "valid-session",
       message: "Draft me an email for R260766",
     }));
 
     expect(response.status).toBe(200);
-    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "Draft me an email for R260766", true);
     expect(proof.draftEmail).not.toHaveBeenCalled();
     const body = await response.text();
-    expect(body).toContain("Draft me an email for R260766");
-    expect(body).toContain("What should the email achieve?");
-    expect(body).toContain('name="jobNumber" value="R260766"');
-    expect(body).toContain("Nothing will be sent");
+    expect(body).toContain("Review-only email draft");
+    expect(body).toContain("Site measure postponed.");
+    expect(body).not.toContain('name="emailRecipient"');
+  });
+
+  it("returns a next-step recommendation without an email when staff ask what next", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Confirm the current measure position.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: null,
+      coverage: { included: ["core Job/customer fields", "Job diary notes"], excluded: ["email", "SMS"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const response = await POST(request({ session: "valid-session", message: "What should we do next for R260766?" }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "What should we do next for R260766?", false);
+    const body = await response.text();
+    expect(body).toContain("Confirm the current measure position.");
+    expect(body).toContain("Not checked: email, SMS");
+    expect(body).not.toContain("Review-only email draft");
+  });
+
+  it("keeps the selected Job for a conversational follow-up without guessing a new Job", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Review the site measure record.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: null,
+      coverage: { included: ["Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const response = await POST(request({ session: "valid-session", contextJobNumber: "R260766", message: "What next?" }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "What next?", false);
+    expect(await response.text()).toContain('name="contextJobNumber" value="R260766"');
+  });
+
+  it("rejects malformed selected Job context before ServiceM8 access", async () => {
+    const response = await POST(request({ session: "valid-session", contextJobNumber: "../../R260766", message: "What next?" }));
+    expect(response.status).toBe(400);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).not.toHaveBeenCalled();
   });
 
   it("does not read ServiceM8 for unsupported or autonomous requests", async () => {
@@ -401,10 +491,32 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
     expect(proof.draftEmail).not.toHaveBeenCalled();
     const body = await response.text();
-    expect(body).toContain("Ask what happened to the Job, or ask for an email draft.");
+    expect(body).toContain("Ask what happened, what to do next, or for an email draft for one Job.");
     expect(body).toContain('name="message"');
     expect(body).not.toContain('name="query"');
     expect(body).not.toContain("Send email");
+  });
+
+  it("does not turn an ambiguous message request into an email", async () => {
+    const response = await POST(request({ session: "valid-session", message: "Write a message for R260766" }));
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).not.toHaveBeenCalled();
+    expect(await response.text()).toContain("Ask what happened, what to do next, or for an email draft");
+  });
+
+  it("treats a request to summarize in an email as one email task", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Check whether the cited Job note still needs a follow-up with the customer.", suggestedContact: "customer",
+        source: { id: "note:1", at: null, text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: { subject: "Job R260766", body: "Could you please confirm the current position for Job R260766?", citations: ["job:record", "note:1"] },
+      coverage: { included: ["Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const message = "Draft an email summarizing what happened to R260766";
+    const response = await POST(request({ session: "valid-session", message }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", message, true);
   });
 
   it("does not read ServiceM8 when a conversation names more than one Job", async () => {
@@ -455,14 +567,99 @@ describe("assistant proof route", () => {
       session: "valid-session",
       jobNumber: "R260766",
       emailPurpose: "Follow up on the site measure",
+      emailRecipient: "customer",
     }));
 
     expect(response.status).toBe(200);
-    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure");
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure", "customer", undefined);
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
     const body = await response.text();
     expect(body).toContain("Site measure follow-up");
     expect(body).toContain("nothing was sent");
     expect(body).not.toContain("Send email");
+  });
+
+  it("requires a supported recipient before reading a Job for a draft", async () => {
+    for (const emailRecipient of [undefined, "unknown"]) {
+      const response = await POST(request({
+        session: "valid-session",
+        jobNumber: "R260766",
+        emailPurpose: "Give the customer a progress update",
+        ...(emailRecipient ? { emailRecipient } : {}),
+      }));
+      expect(response.status).toBe(400);
+    }
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("routes a supported revision while rejecting unknown styles before a Job read", async () => {
+    proof.draftEmail.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Give the customer a progress update",
+      recipient: "customer",
+      draft: { subject: "10 Queen Street (R260766) – Progress update", body: "Hello,", citations: ["job:record"] },
+      coverage: { included: ["core Job/customer fields"], excluded: ["email"], noteCount: 0, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const fields = { session: "valid-session", jobNumber: "R260766", emailPurpose: "Give the customer a progress update", emailRecipient: "customer" };
+    expect((await POST(request({ ...fields, emailRevision: "shorter" }))).status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", fields.emailPurpose, "customer", "shorter");
+    vi.clearAllMocks();
+    expect((await POST(request({ ...fields, emailRevision: "unbounded" }))).status).toBe(400);
+    expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("asks for the exact customer question when the goal is too vague", async () => {
+    validateEmailGoal.mockImplementationOnce(() => { throw new ProofGoalClarificationError(); });
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Update the customer and ask about timing",
+    }));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("What exact question should this email ask?");
+    expect(body).toContain('name="jobNumber" value="R260766"');
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(body).not.toContain("Email draft —");
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(requireVendorAccount).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("asks for a supported goal when checked Job evidence cannot support an update", async () => {
+    proof.draftEmail.mockRejectedValueOnce(new ProofGoalClarificationError(
+      "The checked Job records do not support a progress update. Please choose a question-only goal or verify the update in ServiceM8.",
+    ));
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Give the customer a progress update",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledOnce();
+    const body = await response.text();
+    expect(body).toContain("checked Job records do not support a progress update");
+    expect(body).toContain('name="jobNumber" value="R260766"');
+    expect(body).not.toContain("Email draft —");
+  });
+
+  it("withholds an AI suggestion that fails the Job evidence check", async () => {
+    proof.draftEmail.mockRejectedValueOnce(new ProofEmailSuggestionError("Email suggestion contains an unsupported claim"));
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Give the customer a progress update",
+    }));
+
+    expect(response.status).toBe(502);
+    const body = await response.text();
+    expect(body).toContain("could not be supported by the checked Job records");
+    expect(body).toContain("Nothing was sent");
+    expect(body).not.toContain("Email suggestion contains an unsupported claim");
   });
 });

@@ -60,8 +60,29 @@ export type ProofSummarizer = {
 };
 
 export type ProofEmailDrafter = {
-  draft(evidence: readonly ProofEvidence[], purpose: string): Promise<{ citations: string[] }>;
+  draft(
+    evidence: readonly ProofEvidence[], purpose: string, recipient: EmailRecipient, revision: EmailRevision,
+    candidates: readonly EmailCandidate[], facts: readonly EmailFact[],
+  ): Promise<{ candidateId: string; factId: string }>;
 };
+
+export type EmailCandidate = { id: string; subjectReason: string; question: string };
+export type EmailFact = { id: string; text: string; citations: string[] };
+export type JobAdviceSelection = {
+  nextAction: string;
+  recipient: EmailRecipient;
+  question: string;
+  evidenceId: string;
+  evidenceQuote: string;
+};
+export type ProofJobAdvisor = {
+  advise(evidence: readonly ProofEvidence[], staffRequest: string): Promise<JobAdviceSelection>;
+};
+
+export const emailRecipients = ["customer", "builder", "supplier", "internal"] as const;
+export type EmailRecipient = typeof emailRecipients[number];
+export const emailRevisions = ["shorter", "warmer", "more-formal"] as const;
+export type EmailRevision = typeof emailRevisions[number] | "standard";
 
 export class ProofResolutionError extends Error {
   constructor() {
@@ -77,10 +98,32 @@ export class ProofSearchTooBroadError extends Error {
   }
 }
 
+export class ProofGoalClarificationError extends Error {
+  constructor(message = "State the specific question to ask the customer") {
+    super(message);
+    this.name = "ProofGoalClarificationError";
+  }
+}
+
+export class ProofEmailSuggestionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProofEmailSuggestionError";
+  }
+}
+
+export class ProofJobAdviceError extends Error {
+  constructor() {
+    super("Job advice is not supported by the checked notes");
+    this.name = "ProofJobAdviceError";
+  }
+}
+
 type Dependencies = {
   reader: ProofReader;
   summarizer: ProofSummarizer;
   drafter?: ProofEmailDrafter;
+  advisor?: ProofJobAdvisor;
   now?: () => Date;
 };
 
@@ -126,33 +169,53 @@ function emailObjective(purpose: string) {
     .trim();
 }
 
-function emailSubject(jobNumber: string, objective: string) {
-  let topic = objective
-    .replace(/\s+(?:with|before|after)\b.*$/i, "")
-    .replace(/^(\S+)\s+(?:the|an?)\s+/i, "$1 ")
-    .trim();
-  const withoutTiming = topic.replace(/\s+for\s+(?:next|this|last)\s+(?:week|month|year)(?:'s)?\b.*$/i, "");
-  if (withoutTiming.split(/\s+/).length >= 3) topic = withoutTiming;
-  const confirmation = /^confirm\s+(?:whether\s+|if\s+)?(?:the\s+)?(.+)$/i.exec(objective);
-  const followUp = /^follow up after (?:the )?(.+)$/i.exec(objective);
-  const followUpWith = /^follow up with .+?\s+(?:about|regarding|on)\s+(?:the\s+)?(.+)$/i.exec(objective);
-  const request = /^request\s+(?:an?\s+)?(.+)$/i.exec(objective);
-  const customerUpdate = /^(?:give|provide|send)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(.+)$/i.exec(objective);
-  const generalTopic = /^(?:discuss|check|review|clarify|arrange|coordinate)\s+(?:the\s+|an?\s+)?(.+)$/i.exec(objective);
-  if (confirmation) topic = `Confirm ${confirmation[1]}`;
-  else if (followUp) topic = `${followUp[1]} follow-up`;
-  else if (followUpWith) topic = `${followUpWith[1]} follow-up`;
-  else if (request) topic = `${request[1]} request`;
-  else if (customerUpdate) topic = customerUpdate[1];
-  else if (generalTopic) {
-    const detail = generalTopic[1].replace(/\s+(?:with|before|after)\b.*$/i, "").trim();
-    if (detail) topic = `Regarding ${detail}`;
+function isCustomerUpdate(objective: string) {
+  return /^(?:(?:give|provide|send|share|write|draft)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(?:progress\s+)?update|update\s+(?:the\s+)?(?:customer|client))\b/i.test(objective);
+}
+
+function customerFollowUpQuestion(purpose: string) {
+  const raw = /\bask\s+(?:(?:them|the customer|the client)\s+)?(.+)$/i.exec(purpose)?.[1];
+  if (!raw) return null;
+  const withReason = raw.replace(/[.!?]+$/, "").trim();
+  let clause = withReason;
+  for (const match of withReason.matchAll(/\s+(because|now that|given that|since|as)\b/gi)) {
+    const marker = match[1].toLowerCase();
+    const tail = withReason.slice(match.index).trim();
+    if (marker === "as" && (
+      /\b(?:early|late|soon)\s*$/i.test(withReason.slice(0, match.index)) ||
+      /^as\s+(?:early|late|soon)\s+as\b/i.test(tail) ||
+      (/^as\s+(?:(?:the|a|an)\s+)?(?:[\w'-]+\s+){0,5}(?:date|time|day|slot)$/i.test(tail) &&
+        !/\b(?:has|have|had|is|was|were|are|been|approved|received|confirmed|paid|completed|booked|accepted|sent|arrived)\b/i.test(tail))
+    )) continue;
+    if (marker === "since" && /^since\s+(?:last|this)\s+(?:week|month|year|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(tail)) continue;
+    clause = withReason.slice(0, match.index).trim();
+    break;
   }
-  topic = topic.replace(/^./, (letter) => letter.toUpperCase());
-  const clipped = topic.length <= 55
-    ? topic
-    : topic.slice(0, 55).replace(/\s+\S*$/, "").trim() || topic.slice(0, 55);
-  return `${jobNumber} – ${clipped}`;
+  if (!clause || clause.length > 160) return null;
+  if (/^(?:whether|if)\s+they\s+have\s+any\s+questions$/i.test(clause)) {
+    return "Please let us know if you have any questions.";
+  }
+  const directed = clause.replace(/\bthey\b/gi, "you").replace(/\bthem\b/gi, "you").replace(/\btheir\b/gi, "your");
+  if (/^(?:whether|if|when|what|where|which|how)\b/i.test(directed)) {
+    return `Could you please let us know ${directed}?`;
+  }
+  if (/^for\s+(?:your|the|an?)\s+\S/i.test(directed)) {
+    return `Could you please share ${directed.replace(/^for\s+/i, "")}?`;
+  }
+  if (/^to\s+(?:confirm|share|provide|send|tell|approve|review|choose|suggest)\b/i.test(directed)) {
+    return `Could you please ${directed.replace(/^to\s+/i, "")}?`;
+  }
+  return null;
+}
+
+export function validateEmailGoal(requestedPurpose: string, recipient: EmailRecipient) {
+  const purpose = normalizeText(requestedPurpose.trim());
+  if (!purpose || purpose.length > 500) throw new Error("Email purpose is invalid");
+  if (recipient === "customer" && isCustomerUpdate(emailObjective(purpose)) &&
+      /\bask\b/i.test(purpose) && !customerFollowUpQuestion(purpose)) {
+    throw new ProofGoalClarificationError();
+  }
+  return purpose;
 }
 
 function normalizeDate(value: string) {
@@ -189,75 +252,84 @@ function evidenceTimeline(evidence: readonly ProofEvidence[]) {
     .sort((left, right) => left.at.localeCompare(right.at));
 }
 
+function emailCandidates(purpose: string, recipient: EmailRecipient): EmailCandidate[] {
+  const candidates: EmailCandidate[] = [];
+  const add = (id: string, subjectReason: string, question: string) => candidates.push({ id, subjectReason, question });
+  const bc = /\bBC\b|\bbuilding consent\b/i.test(purpose);
+  const programming = /\bprogram(?:med|ming)?\b/i.test(purpose);
+  if (bc && programming) add("bc-programming", "BC status and programming", "Could you please confirm whether BC approval has been received and whether this Job can be programmed?");
+  else if (bc) add("bc-status", "BC approval status", "Could you please confirm whether BC approval has been received?");
+  else if (programming) add("programming", "Programming", "Could you please confirm whether this Job can be programmed?");
+  if (/\bquote\b/i.test(purpose)) add("quote", "Quote follow-up", "Could you please confirm the current quote position and any next steps?");
+  const day = /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i.exec(purpose)?.[1];
+  if (day) {
+    const installation = /\binstall(?:ation|ing)?\b/i.test(purpose);
+    add("proposed-day", installation ? "Installation timing" : "Timing", `Would ${day} suit you ${installation ? "for installation" : "for the next step"}?`);
+  } else if (/\binstall(?:ation|ing)?\b/i.test(purpose) && /\bdate|timing|schedule\b/i.test(purpose)) {
+    add("installation-date", "Installation timing", "Could you please share your preferred installation date?");
+  }
+  if (/\bsite measure\b/i.test(purpose)) add("site-measure", "Site measure follow-up", "Could you please confirm the next step for the site measure?");
+  if (recipient === "builder" && /\bcoordinat|site|access\b/i.test(purpose)) {
+    add("builder-site", "Site timing and access", "Could you please confirm site timing and access requirements?");
+  }
+  if (recipient === "supplier" && /\bcoordinat|material|deliver\b/i.test(purpose)) {
+    add("supplier-materials", "Materials and delivery", "Could you please confirm material availability and expected delivery timing?");
+  }
+  if (/\b(?:send|share|provide)\b.{0,50}\b(?:photos?|pictures?)\b/i.test(purpose)) {
+    const subject = /\b(window|glass|door|pool|site|area)\b/i.exec(purpose)?.[1]?.toLowerCase();
+    if (subject) add("condition-photos", "Photos of the Job", `Could you please send photos showing the current condition of the ${subject}?`);
+    else add("job-photos", "Job photos", "Could you please send photos showing the current Job condition?");
+  }
+  if (candidates.length === 0) {
+    if (recipient === "customer" && isCustomerUpdate(emailObjective(purpose))) {
+      add("customer-update", "Progress update", "Could you please let us know if you have any questions about this Job?");
+    } else if (/^(?:(?:please )?(?:ask (?:the )?(?:customer|builder|supplier) to )?confirm (?:the )?next steps?|(?:request|ask for) (?:an? )?update|follow up(?: on (?:the )?next steps?)?|coordinate (?:the )?next steps?)\.?$/i.test(purpose)) {
+      add("next-step", "Next steps", "Could you please confirm the next step for this Job?");
+    } else throw new ProofGoalClarificationError("I can draft questions about Job timing, quote or BC status, site access, materials, photos, or next steps. Which should this email ask about?");
+  }
+  return candidates;
+}
+
+function emailFacts(job: ProofJob): EmailFact[] {
+  const facts: EmailFact[] = [];
+  if (job.status) facts.push({ id: "job-status", text: `The Job is recorded as ${normalizeText(job.status)}.`, citations: ["job:record"] });
+  return facts;
+}
+
 function buildEmailDraft(
-  selection: { citations: string[] },
-  evidence: readonly ProofEvidence[],
+  selection: { candidateId: string; factId: string },
   job: ProofJob,
-  company: ProofCompany,
   purpose: string,
+  recipient: EmailRecipient,
+  revision: EmailRevision,
+  candidates: readonly EmailCandidate[],
+  facts: readonly EmailFact[],
 ) {
-  const references = new Set(evidence.map((item) => item.id));
-  const selected = selection.citations;
-  if (
-    !Array.isArray(selected) || selected.length === 0 || selected.length > 5 ||
-    new Set(selected).size !== selected.length || selected.some((citation) => !references.has(citation))
-  ) {
-    throw new Error("Email draft has an unsupported citation");
+  if (Object.keys(selection).sort().join(",") !== "candidateId,factId") {
+    throw new ProofEmailSuggestionError("Email suggestion is invalid");
   }
-
-  const selectedNotes = selected
-    .filter((citation) => citation.startsWith("note:"))
-    .map((citation) => evidence.find((item) => item.id === citation))
-    .filter((item): item is ProofEvidence => item !== undefined);
+  const candidate = candidates.find((item) => item.id === selection.candidateId);
+  let fact = selection.factId === "none" ? null : facts.find((item) => item.id === selection.factId);
+  if (!candidate || (selection.factId !== "none" && !fact)) throw new ProofEmailSuggestionError("Email suggestion is invalid");
+  if (recipient === "customer" && isCustomerUpdate(emailObjective(purpose)) && !fact) {
+    fact = facts[0];
+    if (!fact) throw new ProofGoalClarificationError("The checked Job records do not support a progress update. Please choose a question-only goal or verify the update in ServiceM8.");
+  }
   const normalizedAddress = normalizeText(job.address);
+  const shortAddress = normalizedAddress.length > 70
+    ? `${normalizedAddress.slice(0, 67).replace(/\s+\S*$/, "").trim()}…`
+    : normalizedAddress;
+  const jobReference = shortAddress ? `${shortAddress} (${job.jobNumber})` : job.jobNumber;
+  const subject = `${jobReference} – ${candidate.subjectReason}`;
+  if (subject.length > 200) throw new ProofEmailSuggestionError("Email suggestion is invalid");
+  const greeting = recipient === "internal" ? "Hi team," : revision === "more-formal" ? "Dear team," : "Hello,";
   const address = normalizedAddress ? ` at ${normalizedAddress}` : "";
-  const programmingRequest = /\bprogram(?:med|ming)?\b/i.test(purpose) && /\bBC\b/i.test(purpose);
-  const approvalUncertain = selectedNotes.some((note) => /\bBC\b.{0,60}\b(?:not|pending|awaiting|unconfirmed|declined|rejected|revoked)\b/i.test(note.text));
-  const approvedInEvidence = !approvalUncertain && selectedNotes.some((note) =>
-    /\bBC\b\s+(?:(?:has\s+been|was|is)\s+)?approved\b(?!\s*\?)/i.test(note.text));
-  const confirmedMeasure = /^site measure (?:(?:has been|was|is) )?completed[.!]?$/i;
-  const measureNotes = evidence.filter((item) =>
-    item.id.startsWith("note:") && /\bsite measure\b/i.test(item.text));
-  const siteMeasureNote = measureNotes.every((note) => confirmedMeasure.test(note.text))
-    ? selectedNotes.find((note) => confirmedMeasure.test(note.text))
-    : undefined;
-  const objective = emailObjective(purpose);
-  const customerUpdate = /^(?:give|provide|send)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(?:progress\s+)?update\b/i.test(objective);
-  const subject = programmingRequest
-    ? `${job.jobNumber} – ${approvedInEvidence ? "Confirm programming after BC approval" : "Confirm BC status and programming"}`
-    : emailSubject(job.jobNumber, objective);
-  const programmingQuestion = approvedInEvidence
-    ? "Could you please confirm whether this Job can now be programmed following the BC approval?"
-    : "Could you please confirm whether BC approval has been received and whether this Job can now be programmed?";
-  const request = customerUpdate
-    ? "I wanted to share an update on your Job."
-    : programmingRequest
-    ? programmingQuestion
-    : `Could you please ${objective.replace(/^./, (letter) => letter.toLowerCase())}?`;
-  const updates = [
-    customerUpdate && job.status ? `The Job is recorded as ${normalizeText(job.status)}.` : "",
-    siteMeasureNote ? "Our records show the site measure is complete." : "",
-    customerUpdate && programmingRequest ? programmingQuestion : "",
-  ].filter(Boolean);
-  const prefix = [
-    "Hello,",
-    "",
-    `I'm writing regarding Job ${job.jobNumber}${address}.`,
-  ].join("\n") + "\n\n";
-  const suffix = "\n\nKind regards,\nRoyal Glass";
-  const citedNotes = new Set<string>();
-  if (siteMeasureNote) citedNotes.add(siteMeasureNote.id);
-  if (programmingRequest && approvedInEvidence) {
-    for (const note of selectedNotes) {
-      if (/\bBC\b\s+(?:(?:has\s+been|was|is)\s+)?approved\b(?!\s*\?)/i.test(note.text)) citedNotes.add(note.id);
-    }
-  }
-
-  return {
-    subject,
-    body: `${prefix}${[request, ...updates].join("\n\n")}${suffix}`.slice(0, MAX_EMAIL_BODY_LENGTH),
-    citations: ["job:record", "company:record", ...citedNotes],
-  };
+  const introduction = revision === "shorter" ? [] : [`I'm writing regarding Job ${job.jobNumber}${address}.`];
+  const warmer = revision === "warmer" ? ["I hope you're well."] : [];
+  const closing = revision === "shorter" ? "Thanks,\nRoyal Glass" : "Kind regards,\nRoyal Glass";
+  const body = [greeting, ...warmer, ...introduction, ...(fact ? [fact.text] : []), candidate.question, closing].join("\n\n");
+  if (body.length > MAX_EMAIL_BODY_LENGTH) throw new ProofEmailSuggestionError("Email suggestion is invalid");
+  return { subject, body, citations: [...new Set(["job:record", "company:record", ...(fact?.citations ?? [])])] };
 }
 
 function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
@@ -276,7 +348,7 @@ function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
   ];
 }
 
-export function createOfficeAssistantProof({ reader, summarizer, drafter, now = () => new Date() }: Dependencies) {
+export function createOfficeAssistantProof({ reader, summarizer, drafter, advisor, now = () => new Date() }: Dependencies) {
   async function jobsByNumber(jobNumbers: readonly string[]) {
     const rows = await reader.listJobsByNumber(jobNumbers);
     return rows
@@ -382,17 +454,82 @@ export function createOfficeAssistantProof({ reader, summarizer, drafter, now = 
       };
     },
 
-    async draftEmail(requestedJobNumber: string, requestedPurpose: string) {
+    async draftEmail(requestedJobNumber: string, requestedPurpose: string, recipient: EmailRecipient = "customer", revision: EmailRevision = "standard") {
       if (!drafter) throw new Error("Email drafting is not configured");
-      const purpose = normalizeText(requestedPurpose.trim());
-      if (!purpose || purpose.length > 500) throw new Error("Email purpose is invalid");
+      if (!emailRecipients.includes(recipient)) throw new Error("Email recipient is invalid");
+      if (revision !== "standard" && !emailRevisions.includes(revision as typeof emailRevisions[number])) throw new Error("Email revision is invalid");
+      const purpose = validateEmailGoal(requestedPurpose, recipient);
       const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
-      const selection = await drafter.draft(evidence, purpose);
-      const draft = buildEmailDraft(selection, evidence, job, company, purpose);
+      const candidates = emailCandidates(purpose, recipient);
+      const facts = emailFacts(job);
+      if (recipient === "customer" && isCustomerUpdate(emailObjective(purpose)) && facts.length === 0) {
+        throw new ProofGoalClarificationError("The checked Job records do not support a progress update. Please choose a question-only goal or verify the update in ServiceM8.");
+      }
+      const selection = await drafter.draft(evidence, purpose, recipient, revision, candidates, facts);
+      const draft = buildEmailDraft(selection, job, purpose, recipient, revision, candidates, facts);
       return {
         job: { jobNumber: job.jobNumber, address: job.address, customerName: company.name },
         purpose,
+        recipient,
         draft,
+        sources: draft.citations.map((id) => evidence.find((item) => item.id === id)).filter((item): item is ProofEvidence => item !== undefined),
+        coverage,
+      };
+    },
+
+    async adviseJob(requestedJobNumber: string, staffRequest = "What should we do next?", includeEmail = false) {
+      if (!advisor) throw new Error("Job advice is not configured");
+      const request = normalizeText(staffRequest.trim());
+      if (!request || request.length > 500) throw new Error("Job advice request is invalid");
+      const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
+      const notes = evidence.filter((item) => item.id.startsWith("note:") && item.text.length > 0);
+      if (notes.length === 0) {
+        throw new ProofGoalClarificationError("No Job notes were available for a next-step recommendation. Check the Job Diary in ServiceM8 before acting.");
+      }
+      const advice = await advisor.advise(evidence, request);
+      if (!advice || Object.keys(advice).sort().join(",") !== "evidenceId,evidenceQuote,nextAction,question,recipient" ||
+          !emailRecipients.includes(advice.recipient)) throw new ProofJobAdviceError();
+      const source = notes.find((item) => item.id === advice.evidenceId);
+      const modelAction = advice.nextAction.trim();
+      const modelQuestion = advice.question.trim();
+      const quote = advice.evidenceQuote.trim();
+      const addressedContact = request.match(/\b(?:to|for)\s+(?:(?:the|our|a)\s+)?(office team|customer|client|builder|supplier|team|office|internal)\b/i)?.[1]?.toLowerCase();
+      const requestedContact = addressedContact === "client" ? "customer"
+        : addressedContact === "team" || addressedContact === "office" || addressedContact === "office team" ? "internal"
+        : addressedContact as EmailRecipient | undefined;
+      const recipient = requestedContact ?? advice.recipient;
+      if (!source || quote.length < 8 || quote.length > 300 || !source.text.includes(quote) ||
+          modelAction.length < 8 || modelAction.length > 300 || /[\r\n]/.test(modelAction) || normalizeText(modelAction) !== modelAction ||
+          modelQuestion.length < 8 || modelQuestion.length > 350 || /[\r\n]/.test(modelQuestion) ||
+          normalizeText(modelQuestion) !== modelQuestion) throw new ProofJobAdviceError();
+      // The model chooses a relevant note and contact. Its prose is not used as a
+      // factual claim or customer question: an exact quote alone cannot verify it.
+      const topic = /\b(?:site\s+)?measure(?:ment|ments|d)?\b/i.test(quote) ? "site measure"
+        : /\b(?:quote|quotation|estimate)\b/i.test(quote) ? "quote"
+        : /\b(?:booking|appointment|schedule|scheduled)\b/i.test(quote) ? "booking"
+        : /\b(?:install|installation|installed)\b/i.test(quote) ? "installation"
+        : /\b(?:consent|council|building\s+approval)\b/i.test(quote) ? "consent"
+        : /\b(?:delivery|delivered|dispatch)\b/i.test(quote) ? "delivery"
+        : "Job";
+      const contact = recipient === "internal" ? "the office team" : `the ${recipient}`;
+      const action = `Confirm the current ${topic === "Job" ? "Job position" : `${topic} status`} with ${contact} before deciding the next step.`;
+      const question = `Could you please confirm the current ${topic === "Job" ? "position" : `${topic} status`} for Job ${job.jobNumber}?`;
+      const normalizedAddress = normalizeText(job.address);
+      const shortAddress = normalizedAddress.length > 70
+        ? `${normalizedAddress.slice(0, 67).replace(/\s+\S*$/, "").trim()}…`
+        : normalizedAddress;
+      const subject = `${shortAddress ? `${shortAddress} (${job.jobNumber})` : job.jobNumber} – Job follow-up`;
+      const body = [
+        recipient === "internal" ? "Hi team," : "Hello,",
+        `I'm writing regarding Job ${job.jobNumber}${normalizedAddress ? ` at ${normalizedAddress}` : ""}.`,
+        question,
+        "Kind regards,\nRoyal Glass",
+      ].join("\n\n");
+      if (subject.length > 200 || body.length > MAX_EMAIL_BODY_LENGTH) throw new ProofJobAdviceError();
+      return {
+        job: { jobNumber: job.jobNumber, address: job.address, customerName: company.name },
+        recommendation: { nextAction: action, suggestedContact: recipient, source, quote },
+        draft: includeEmail ? { subject, body, citations: ["job:record", source.id] } : null,
         coverage,
       };
     },

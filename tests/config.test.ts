@@ -11,7 +11,7 @@ beforeEach(() => {
     SERVICEM8_APP_ID: "app-id",
     SERVICEM8_APP_SECRET: "app-secret-with-enough-length",
     SERVICEM8_OAUTH_REDIRECT_URI: "https://office.example.test/api/servicem8/oauth/callback",
-    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff",
+    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments",
     SERVICEM8_ALLOWED_ACCOUNT_UUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     DATABASE_URL: "postgres://unused",
     TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),

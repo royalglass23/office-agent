@@ -45,7 +45,7 @@ export function renderMenuAssistant(staffFirstName: string) {
   return document(body, styles, script);
 }
 
-const proofStyles = `.assistant-shell{max-width:780px;margin:0 auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#53657d;margin:0 0 6px}.search{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.search-row{display:flex;gap:10px;align-items:end}label{display:block;font-weight:650;margin-bottom:7px}.field{flex:1}input[type=text],textarea{box-sizing:border-box;width:100%;border:1px solid #9baaba;border-radius:8px;padding:11px;font:inherit}textarea{resize:vertical}button{border:0;border-radius:8px;padding:11px 18px;background:#175cd3;color:#fff;font:inherit;font-weight:650;cursor:pointer}button:disabled{cursor:wait;opacity:.7}.match{display:block;width:100%;margin:10px 0;padding:14px;text-align:left;background:#fff;color:#182230;border:1px solid #b8c2ce}.match strong,.match span{display:block}.summary{font-size:17px;line-height:1.55}.timeline{padding-left:22px}.timeline li{margin:0 0 16px}.sources,.coverage,.privacy{font-size:13px;color:#53657d}.coverage{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}.draft-card{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.draft-body{white-space:pre-wrap;font:inherit;line-height:1.55;margin:0}@media(max-width:560px){.search-row{align-items:stretch;flex-direction:column}}`;
+const proofStyles = `.assistant-shell{max-width:780px;margin:0 auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#53657d;margin:0 0 6px}.search{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.search-row{display:flex;gap:10px;align-items:end}label{display:block;font-weight:650;margin-bottom:7px}.field{flex:1}input[type=text],textarea,select{box-sizing:border-box;width:100%;border:1px solid #9baaba;border-radius:8px;padding:11px;font:inherit}textarea{resize:vertical}button{border:0;border-radius:8px;padding:11px 18px;background:#175cd3;color:#fff;font:inherit;font-weight:650;cursor:pointer}button:disabled{cursor:wait;opacity:.7}.match{display:block;width:100%;margin:10px 0;padding:14px;text-align:left;background:#fff;color:#182230;border:1px solid #b8c2ce}.match strong,.match span{display:block}.summary{font-size:17px;line-height:1.55}.timeline{padding-left:22px}.timeline li{margin:0 0 16px}.sources,.coverage,.privacy{font-size:13px;color:#53657d}.coverage{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}.draft-card{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.draft-body{white-space:pre-wrap;font:inherit;line-height:1.55;margin:0}@media(max-width:560px){.search-row{align-items:stretch;flex-direction:column}}`;
 
 const proofSubmitOnceScript = `document.addEventListener("submit",async function(event){const form=event.target;if(!(form instanceof HTMLFormElement)||form.method.toLowerCase()!=="post")return;event.preventDefault();if(form.dataset.submitted==="true")return;form.dataset.submitted="true";form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=true;button.textContent=button.dataset.pendingLabel||"Checking…";});try{const response=await fetch(form.action,{method:"POST",body:new URLSearchParams(new FormData(form)),headers:{"Content-Type":"application/x-www-form-urlencoded"},credentials:"omit",cache:"no-store",redirect:"error"});const page=await response.text();const next=new DOMParser().parseFromString(page,"text/html");document.documentElement.innerHTML=next.documentElement.innerHTML;}catch{form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=false;button.textContent="Try again";});form.dataset.submitted="false";let notice=form.querySelector('.submit-error');if(!notice){notice=document.createElement('p');notice.className='notice error submit-error';form.appendChild(notice);}notice.textContent='The request could not be completed. Check your connection and try again.';}});`;
 
@@ -59,10 +59,9 @@ function searchForm(actionUrl: URL, sessionToken: string) {
 <p class="privacy">Read-only proof. Search the connected ServiceM8 account by address or Job number.</p></form>`;
 }
 
-function emailDraftForm(jobNumber: string, actionUrl: URL, sessionToken: string) {
-  return `<form class="search" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}
-<input type="hidden" name="jobNumber" value="${escapeHtml(jobNumber)}"><label for="emailPurpose">What should the email achieve?</label><textarea id="emailPurpose" name="emailPurpose" rows="3" maxlength="500" required placeholder="e.g. Follow up after the site measure"></textarea><button type="submit" data-pending-label="Drafting…">Draft email</button>
-<p class="privacy">Draft only. Review and copy it yourself. Nothing will be sent or saved to ServiceM8.</p></form>`;
+function jobAdviceForm(jobNumber: string, actionUrl: URL, sessionToken: string) {
+  const prefix = `<form class="search" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<input type="hidden" name="jobNumber" value="${escapeHtml(jobNumber)}">`;
+  return `${prefix}<input type="hidden" name="jobAdvice" value="recommend"><button type="submit" data-pending-label="Reviewing…">Suggest next step</button></form>${prefix}<input type="hidden" name="jobAdvice" value="email"><button type="submit" data-pending-label="Drafting…">Suggest next step and draft email</button></form><p class="privacy">Review suggestions against the Job Diary. Nothing is sent or saved to ServiceM8.</p>`;
 }
 
 export function renderProofAssistant(staffFirstName: string, actionUrl: URL, sessionToken: string) {
@@ -121,14 +120,16 @@ function proofAnswerContent(answer: RenderableProofAnswer) {
 
 export function renderProofAnswer(answer: RenderableProofAnswer, actionUrl: URL, sessionToken: string) {
   return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Selected Job result</h1>${proofAnswerContent(answer)}
-<h2>Draft an email</h2>${emailDraftForm(answer.job.jobNumber, actionUrl, sessionToken)}
+<h2>What next?</h2>${jobAdviceForm(answer.job.jobNumber, actionUrl, sessionToken)}
+<h2>Ask about this Job</h2>${conversationForm(actionUrl, sessionToken, answer.job.jobNumber)}
 <h2>Check another Job</h2>${searchForm(actionUrl, sessionToken)}</main>`, proofStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 const conversationStyles = `${proofStyles}.conversation{padding:18px;margin:20px 0;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.message{max-width:86%;padding:12px 14px;margin:0 0 14px;border-radius:12px;background:#fff;box-shadow:0 1px 2px #0001}.message.staff{margin-left:auto;background:#dcecff}.message.assistant{margin-right:auto}.message h2,.message h3{margin-top:14px}.chat-form{margin-top:18px}.composer{display:flex;gap:10px;align-items:end}@media(max-width:560px){.message{max-width:94%}.composer{align-items:stretch;flex-direction:column}}`;
 
-function conversationForm(actionUrl: URL, sessionToken: string) {
-  return `<form class="chat-form" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<label for="message">Message</label><div class="composer"><textarea id="message" name="message" rows="2" maxlength="500" required placeholder="e.g. What happened to R260766?"></textarea><button type="submit" data-pending-label="Checking…">Send</button></div><p class="privacy">Read-only. Nothing is sent or saved to ServiceM8.</p></form><form method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<input type="hidden" name="restart" value="1"><button type="submit">Start new conversation</button></form>`;
+function conversationForm(actionUrl: URL, sessionToken: string, selectedJobNumber?: string) {
+  const context = selectedJobNumber ? `<input type="hidden" name="contextJobNumber" value="${escapeHtml(selectedJobNumber)}">` : "";
+  return `<form class="chat-form" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}${context}<label for="message">Message</label><div class="composer"><textarea id="message" name="message" rows="2" maxlength="500" required placeholder="${selectedJobNumber ? "e.g. What should we do next?" : "e.g. What happened to R260766?"}"></textarea><button type="submit" data-pending-label="Checking…">Send</button></div><p class="privacy">Read-only. Nothing is sent or saved to ServiceM8.</p></form><form method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<input type="hidden" name="restart" value="1"><button type="submit">Start new conversation</button></form>`;
 }
 
 export function renderConversationGuidance(
@@ -136,8 +137,9 @@ export function renderConversationGuidance(
   guidance: string,
   actionUrl: URL,
   sessionToken: string,
+  selectedJobNumber?: string,
 ) {
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>${escapeHtml(guidance)}</p></div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>${escapeHtml(guidance)}</p></div></section>${conversationForm(actionUrl, sessionToken, selectedJobNumber)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 export function renderConversationAssistant(
@@ -151,7 +153,7 @@ export function renderConversationAssistant(
   const nameScript = staffFirstName === null
     ? `const greeting=document.getElementById("assistant-greeting");if(greeting){fetch(${JSON.stringify(new URL("/assistant/staff", actionUrl).toString())},{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({session:${JSON.stringify(greetingSessionToken)}}),credentials:"omit",cache:"no-store",redirect:"error"}).then(function(response){if(!response.ok)throw new Error("staff lookup failed");return response.json();}).then(function(result){if(typeof result.first!=="string"||result.first.length===0)throw new Error("staff name unavailable");greeting.textContent="Hi, "+result.first+"—what can I help with?";}).catch(function(){greeting.textContent="What can I help with?";});}`
     : "";
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1 id="assistant-greeting" aria-live="polite">${greeting}</h1><section class="conversation" aria-live="polite"><div class="message assistant"><p>I can help with two read-only tasks:</p><ul><li>What happened to an exact Job number?</li><li>Prepare a review-only email draft for an exact Job number.</li></ul><p>For example: <strong>What happened to R260766?</strong></p></div></section>${conversationForm(actionUrl, sessionToken)}<p class="coverage"><strong>Coverage:</strong> core Job/customer fields and Job diary notes. Not checked: email, SMS, forms, attachments, schedule activity.</p></main>`, conversationStyles, `${nameScript}${proofSubmitOnceScript}`, actionUrl.origin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1 id="assistant-greeting" aria-live="polite">${greeting}</h1><p class="coverage"><strong>Job Diary coverage incomplete.</strong> Job summaries, email drafts and recommendations are unavailable until the full Diary audit passes.</p><section class="conversation" aria-live="polite"><div class="message assistant"><p>You can search for a Job, but I cannot yet give a Job-based answer. Review the full Job Diary in ServiceM8.</p></div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, `${nameScript}${proofSubmitOnceScript}`, actionUrl.origin);
 }
 
 export function renderConversationProofAnswer(
@@ -160,7 +162,7 @@ export function renderConversationProofAnswer(
   actionUrl: URL,
   sessionToken: string,
 ) {
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant">${proofAnswerContent(answer)}<h3>Want an email draft?</h3>${emailDraftForm(answer.job.jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant">${proofAnswerContent(answer)}<h3>What next?</h3>${jobAdviceForm(answer.job.jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken, answer.job.jobNumber)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 export function renderConversationDraftPrompt(
@@ -168,14 +170,31 @@ export function renderConversationDraftPrompt(
   jobNumber: string,
   actionUrl: URL,
   sessionToken: string,
+  clarification?: string,
 ) {
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>I can prepare a review-only draft for ${escapeHtml(jobNumber)}.</p>${emailDraftForm(jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Conversation</h1><section class="conversation" aria-live="polite"><div class="message staff">${escapeHtml(staffMessage)}</div><div class="message assistant"><p>${escapeHtml(clarification || `I can suggest a next step for ${jobNumber}.`)}</p>${jobAdviceForm(jobNumber, actionUrl, sessionToken)}</div></section>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
+}
+
+type RenderableJobAdvice = {
+  job: { jobNumber: string; address: string; customerName: string };
+  recommendation: { nextAction: string; suggestedContact: string; source: { id: string; at: string | null; text: string }; quote: string };
+  draft: { subject: string; body: string; citations: string[] } | null;
+  coverage: RenderableProofAnswer["coverage"];
+};
+
+export function renderJobAdvice(result: RenderableJobAdvice, actionUrl: URL, sessionToken: string) {
+  const source = result.recommendation.source;
+  const partial = result.coverage.truncated ? " The included notes were truncated." : "";
+  const email = result.draft ? `<section class="draft-card"><h2>Review-only email draft</h2><p>Suggested contact: ${escapeHtml(result.recommendation.suggestedContact)}. Check the address and wording before copying. Nothing was sent.</p><label for="draftSubject">Subject</label><input id="draftSubject" type="text" maxlength="200" value="${escapeHtml(result.draft.subject)}"><label for="draftBody">Body</label><textarea id="draftBody" rows="10" maxlength="5000">${escapeHtml(result.draft.body)}</textarea></section>` : "";
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Suggested next step — ${escapeHtml(result.job.jobNumber)}</h1><p class="notice">AI suggestion for staff review. Check the full Job Diary before acting.</p><p class="summary">${escapeHtml(result.recommendation.nextAction)}</p><section class="sources"><h2>Supporting Job note</h2><p><strong>${escapeHtml(source.id)}</strong>${source.at ? ` (${escapeHtml(source.at)})` : ""}: “${escapeHtml(result.recommendation.quote)}”</p></section><p class="coverage"><strong>Coverage:</strong> ${escapeHtml(result.coverage.included.join(" and "))}. Not checked: ${escapeHtml(result.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>${email}<h2>Ask again</h2>${jobAdviceForm(result.job.jobNumber, actionUrl, sessionToken)}${conversationForm(actionUrl, sessionToken, result.job.jobNumber)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
 type RenderableEmailDraft = {
   job: { jobNumber: string; address: string; customerName: string };
   purpose: string;
+  recipient?: string;
   draft: { subject: string; body: string; citations: string[] };
+  sources?: { id: string; at: string | null; text: string }[];
   coverage: RenderableProofAnswer["coverage"];
 };
 
@@ -183,10 +202,12 @@ export function renderEmailDraft(result: RenderableEmailDraft, actionUrl: URL, s
   const partial = result.coverage.truncated ? " The included evidence was truncated." : "";
   return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>Email draft — ${escapeHtml(result.job.jobNumber)}</h1>
 <p class="notice"><strong>Draft only — nothing was sent.</strong> Review the wording and facts before copying it into your email.</p>
-<dl><dt>Address</dt><dd>${escapeHtml(result.job.address || "Not supplied")}</dd><dt>Customer</dt><dd>${escapeHtml(result.job.customerName || "Not supplied")}</dd><dt>Purpose</dt><dd>${escapeHtml(result.purpose)}</dd></dl>
-<section class="draft-card"><h2>Subject</h2><p>${escapeHtml(result.draft.subject)}</p><h2>Body</h2><pre class="draft-body">${escapeHtml(result.draft.body)}</pre>${citations(result.draft.citations)}</section>
+<dl><dt>Address</dt><dd>${escapeHtml(result.job.address || "Not supplied")}</dd><dt>Customer</dt><dd>${escapeHtml(result.job.customerName || "Not supplied")}</dd><dt>Recipient</dt><dd>${escapeHtml(result.recipient || "Customer")}</dd><dt>Purpose</dt><dd>${escapeHtml(result.purpose)}</dd></dl>
+<section class="draft-card"><h2>Review and edit</h2><label for="draftSubject">Subject</label><input id="draftSubject" type="text" maxlength="200" value="${escapeHtml(result.draft.subject)}"><label for="draftBody">Body</label><textarea id="draftBody" rows="12" maxlength="5000">${escapeHtml(result.draft.body)}</textarea><p class="privacy">Edit either field, then select and copy it into your email.</p></section>
+<section class="sources"><h2>Supporting records</h2>${result.sources?.length ? `<ul>${result.sources.map((source) => `<li><strong>${escapeHtml(source.id)}</strong>${source.at ? ` (${escapeHtml(source.at)})` : ""}: ${escapeHtml(source.text)}</li>`).join("")}</ul>` : citations(result.draft.citations)}</section>
 <p class="coverage"><strong>Coverage:</strong> ${escapeHtml(result.coverage.included.join(" and "))}. Not checked: ${escapeHtml(result.coverage.excluded.join(", "))}.${escapeHtml(partial)}</p>
-<h2>Draft another version</h2>${emailDraftForm(result.job.jobNumber, actionUrl, sessionToken)}
+<h2>Revise this draft</h2><form class="search" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<input type="hidden" name="jobNumber" value="${escapeHtml(result.job.jobNumber)}"><input type="hidden" name="emailPurpose" value="${escapeHtml(result.purpose)}"><input type="hidden" name="emailRecipient" value="${escapeHtml(result.recipient || "customer")}"><label for="emailRevision">What should change?</label><select id="emailRevision" name="emailRevision" required><option value="shorter">Make it shorter</option><option value="warmer">Make it warmer</option><option value="more-formal">Make it more formal</option></select><button type="submit" data-pending-label="Revising…">Revise draft</button><p class="privacy">This creates a new review copy from the same limited Job sources. Edits you made above are local to this page.</p></form>
+<h2>Ask for another recommendation</h2>${jobAdviceForm(result.job.jobNumber, actionUrl, sessionToken)}
 <h2>Ask another question</h2>${conversationForm(actionUrl, sessionToken)}</main>`, conversationStyles, proofSubmitOnceScript, actionUrl.origin);
 }
 
