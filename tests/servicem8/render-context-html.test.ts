@@ -13,6 +13,15 @@ import {
 } from "@/lib/servicem8/render-context-html";
 
 describe("renderMenuAssistant", () => {
+  it("shows the two-Job audit form only in staging", () => {
+    const staging = renderConversationAssistant("May", new URL("https://office-agent-staging.vercel.app/assistant"), "signed-session-token", "greeting-token");
+    const production = renderConversationAssistant("May", new URL("https://office-agent-ashy.vercel.app/assistant"), "signed-session-token", "greeting-token");
+    expect(staging).toContain('action="https://office-agent-staging.vercel.app/assistant/audit"');
+    expect(staging).toContain('<option value="R260766">R260766</option><option value="R260609">R260609</option>');
+    expect(staging).toContain('data-audit="true"');
+    expect(production).not.toContain("RG-380 staff audit");
+  });
+
   it("loads the signed staff name after the opening page is rendered", async () => {
     const html = renderConversationAssistant(
       null,

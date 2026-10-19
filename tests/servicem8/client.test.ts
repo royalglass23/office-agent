@@ -116,6 +116,30 @@ describe("ServiceM8Client", () => {
     expect(url.searchParams.get("cursor")).toBe("-1");
   });
 
+  it.each([
+    ["listJobEmailsPage", "email.json", `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`],
+    ["listJobActivitiesPage", "jobactivity.json", `job_uuid eq '${jobUUID}'`],
+    ["listJobAttachmentsPage", "attachment.json", `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`],
+  ] as const)("reads %s with exact Job filter and staff impersonation", async (method, resource, filter) => {
+    const nextCursor = "123e4567-cb72-4d94-8a1e-d454131257eb";
+    const fetcher = vi.fn(async () => Response.json([{ uuid: jobUUID }], {
+      headers: { "x-next-cursor": nextCursor },
+    })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+    await expect(client[method](jobUUID, null)).resolves.toEqual({
+      records: [{ uuid: jobUUID }], nextCursor,
+    });
+    const [url, init] = (fetcher as ReturnType<typeof vi.fn>).mock.calls[0] as [URL, RequestInit];
+    expect(url.pathname).toBe(`/api_1.0/${resource}`);
+    expect(url.searchParams.get("$filter")).toBe(filter);
+    expect(url.searchParams.get("cursor")).toBe("-1");
+    expect(new Headers(init.headers).get("x-impersonate-uuid")).toBe(staffUUID);
+  });
+
   it("fails closed when the account has no OAuth connection", async () => {
     const client = new ServiceM8Client(accountUUID, staffUUID, {
       getConnection: vi.fn(async () => null),
