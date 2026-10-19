@@ -14,6 +14,7 @@ import {
   createOfficeAssistantProof,
   emailRecipients,
   emailRevisions,
+  ProofEmailSuggestionError,
   ProofGoalClarificationError,
   ProofResolutionError,
   ProofSearchTooBroadError,
@@ -265,7 +266,13 @@ export async function POST(request: Request) {
     );
 
     if (form.jobNumber && form.emailPurpose) {
-      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose, form.emailRecipient, form.emailRevision);
+      let result;
+      try {
+        result = await proof.draftEmail(form.jobNumber, form.emailPurpose, form.emailRecipient, form.emailRevision);
+      } catch (error) {
+        if (!(error instanceof ProofGoalClarificationError)) throw error;
+        return html(renderConversationDraftPrompt(form.emailPurpose, form.jobNumber, actionUrl, nextSession, error.message));
+      }
       safeLog("info", "Completed selected Job email draft proof", logContext);
       return html(renderEmailDraft(result, actionUrl, nextSession));
     }
@@ -330,6 +337,10 @@ export async function POST(request: Request) {
     if (error instanceof OpenAIEmailDraftError) {
       safeLog("warn", "OpenAI email draft proof failed closed", { requestId, status: error.status });
       return html(renderProofMessage("Unable to draft this email", "No email draft was accepted. Nothing was sent."), 502);
+    }
+    if (error instanceof ProofEmailSuggestionError) {
+      safeLog("warn", "Email suggestion failed evidence checks", { requestId });
+      return html(renderProofMessage("Unable to draft this email", "The suggested wording could not be supported by the checked Job records. Nothing was sent."), 502);
     }
     if (error instanceof Error && error.message === "Assistant session is invalid") {
       return html(renderProofMessage("Session expired", "Reopen the Office Assistant from ServiceM8."), 401);

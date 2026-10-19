@@ -75,6 +75,7 @@ vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
   emailRevisions: ["shorter", "warmer", "more-formal"],
   createOfficeAssistantProof,
   ProofGoalClarificationError: class ProofGoalClarificationError extends Error {},
+  ProofEmailSuggestionError: class ProofEmailSuggestionError extends Error {},
   validateEmailGoal,
   ProofResolutionError: class ProofResolutionError extends Error {},
   ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
@@ -85,7 +86,7 @@ vi.mock("@/lib/openai/proof-summarizer", () => ({
 }));
 
 import { OPTIONS, POST } from "@/app/assistant/route";
-import { ProofGoalClarificationError, ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
+import { ProofEmailSuggestionError, ProofGoalClarificationError, ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -521,5 +522,40 @@ describe("assistant proof route", () => {
     expect(clientConstructor).not.toHaveBeenCalled();
     expect(requireVendorAccount).not.toHaveBeenCalled();
     expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("asks for a supported goal when checked Job evidence cannot support an update", async () => {
+    proof.draftEmail.mockRejectedValueOnce(new ProofGoalClarificationError(
+      "The checked Job records do not support a progress update. Please choose a question-only goal or verify the update in ServiceM8.",
+    ));
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Give the customer a progress update",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledOnce();
+    const body = await response.text();
+    expect(body).toContain("checked Job records do not support a progress update");
+    expect(body).toContain('name="jobNumber" value="R260766"');
+    expect(body).not.toContain("Email draft —");
+  });
+
+  it("withholds an AI suggestion that fails the Job evidence check", async () => {
+    proof.draftEmail.mockRejectedValueOnce(new ProofEmailSuggestionError("Email suggestion contains an unsupported claim"));
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Give the customer a progress update",
+    }));
+
+    expect(response.status).toBe(502);
+    const body = await response.text();
+    expect(body).toContain("could not be supported by the checked Job records");
+    expect(body).toContain("Nothing was sent");
+    expect(body).not.toContain("Email suggestion contains an unsupported claim");
   });
 });
