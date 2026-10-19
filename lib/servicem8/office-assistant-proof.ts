@@ -68,6 +68,16 @@ export type ProofEmailDrafter = {
 
 export type EmailCandidate = { id: string; subjectReason: string; question: string };
 export type EmailFact = { id: string; text: string; citations: string[] };
+export type JobAdviceSelection = {
+  nextAction: string;
+  recipient: EmailRecipient;
+  question: string;
+  evidenceId: string;
+  evidenceQuote: string;
+};
+export type ProofJobAdvisor = {
+  advise(evidence: readonly ProofEvidence[], staffRequest: string): Promise<JobAdviceSelection>;
+};
 
 export const emailRecipients = ["customer", "builder", "supplier", "internal"] as const;
 export type EmailRecipient = typeof emailRecipients[number];
@@ -102,10 +112,18 @@ export class ProofEmailSuggestionError extends Error {
   }
 }
 
+export class ProofJobAdviceError extends Error {
+  constructor() {
+    super("Job advice is not supported by the checked notes");
+    this.name = "ProofJobAdviceError";
+  }
+}
+
 type Dependencies = {
   reader: ProofReader;
   summarizer: ProofSummarizer;
   drafter?: ProofEmailDrafter;
+  advisor?: ProofJobAdvisor;
   now?: () => Date;
 };
 
@@ -330,7 +348,7 @@ function jobEvidence(job: ProofJob, company: ProofCompany): ProofEvidence[] {
   ];
 }
 
-export function createOfficeAssistantProof({ reader, summarizer, drafter, now = () => new Date() }: Dependencies) {
+export function createOfficeAssistantProof({ reader, summarizer, drafter, advisor, now = () => new Date() }: Dependencies) {
   async function jobsByNumber(jobNumbers: readonly string[]) {
     const rows = await reader.listJobsByNumber(jobNumbers);
     return rows
@@ -455,6 +473,63 @@ export function createOfficeAssistantProof({ reader, summarizer, drafter, now = 
         recipient,
         draft,
         sources: draft.citations.map((id) => evidence.find((item) => item.id === id)).filter((item): item is ProofEvidence => item !== undefined),
+        coverage,
+      };
+    },
+
+    async adviseJob(requestedJobNumber: string, staffRequest = "What should we do next?", includeEmail = false) {
+      if (!advisor) throw new Error("Job advice is not configured");
+      const request = normalizeText(staffRequest.trim());
+      if (!request || request.length > 500) throw new Error("Job advice request is invalid");
+      const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
+      const notes = evidence.filter((item) => item.id.startsWith("note:") && item.text.length > 0);
+      if (notes.length === 0) {
+        throw new ProofGoalClarificationError("No Job notes were available for a next-step recommendation. Check the Job Diary in ServiceM8 before acting.");
+      }
+      const advice = await advisor.advise(evidence, request);
+      if (!advice || Object.keys(advice).sort().join(",") !== "evidenceId,evidenceQuote,nextAction,question,recipient" ||
+          !emailRecipients.includes(advice.recipient)) throw new ProofJobAdviceError();
+      const source = notes.find((item) => item.id === advice.evidenceId);
+      const modelAction = advice.nextAction.trim();
+      const modelQuestion = advice.question.trim();
+      const quote = advice.evidenceQuote.trim();
+      const addressedContact = request.match(/\b(?:to|for)\s+(?:(?:the|our|a)\s+)?(office team|customer|client|builder|supplier|team|office|internal)\b/i)?.[1]?.toLowerCase();
+      const requestedContact = addressedContact === "client" ? "customer"
+        : addressedContact === "team" || addressedContact === "office" || addressedContact === "office team" ? "internal"
+        : addressedContact as EmailRecipient | undefined;
+      const recipient = requestedContact ?? advice.recipient;
+      if (!source || quote.length < 8 || quote.length > 300 || !source.text.includes(quote) ||
+          modelAction.length < 8 || modelAction.length > 300 || /[\r\n]/.test(modelAction) || normalizeText(modelAction) !== modelAction ||
+          modelQuestion.length < 8 || modelQuestion.length > 350 || /[\r\n]/.test(modelQuestion) ||
+          normalizeText(modelQuestion) !== modelQuestion) throw new ProofJobAdviceError();
+      // The model chooses a relevant note and contact. Its prose is not used as a
+      // factual claim or customer question: an exact quote alone cannot verify it.
+      const topic = /\b(?:site\s+)?measure(?:ment|ments|d)?\b/i.test(quote) ? "site measure"
+        : /\b(?:quote|quotation|estimate)\b/i.test(quote) ? "quote"
+        : /\b(?:booking|appointment|schedule|scheduled)\b/i.test(quote) ? "booking"
+        : /\b(?:install|installation|installed)\b/i.test(quote) ? "installation"
+        : /\b(?:consent|council|building\s+approval)\b/i.test(quote) ? "consent"
+        : /\b(?:delivery|delivered|dispatch)\b/i.test(quote) ? "delivery"
+        : "Job";
+      const contact = recipient === "internal" ? "the office team" : `the ${recipient}`;
+      const action = `Confirm the current ${topic === "Job" ? "Job position" : `${topic} status`} with ${contact} before deciding the next step.`;
+      const question = `Could you please confirm the current ${topic === "Job" ? "position" : `${topic} status`} for Job ${job.jobNumber}?`;
+      const normalizedAddress = normalizeText(job.address);
+      const shortAddress = normalizedAddress.length > 70
+        ? `${normalizedAddress.slice(0, 67).replace(/\s+\S*$/, "").trim()}…`
+        : normalizedAddress;
+      const subject = `${shortAddress ? `${shortAddress} (${job.jobNumber})` : job.jobNumber} – Job follow-up`;
+      const body = [
+        recipient === "internal" ? "Hi team," : "Hello,",
+        `I'm writing regarding Job ${job.jobNumber}${normalizedAddress ? ` at ${normalizedAddress}` : ""}.`,
+        question,
+        "Kind regards,\nRoyal Glass",
+      ].join("\n\n");
+      if (subject.length > 200 || body.length > MAX_EMAIL_BODY_LENGTH) throw new ProofJobAdviceError();
+      return {
+        job: { jobNumber: job.jobNumber, address: job.address, customerName: company.name },
+        recommendation: { nextAction: action, suggestedContact: recipient, source, quote },
+        draft: includeEmail ? { subject, body, citations: ["job:record", source.id] } : null,
         coverage,
       };
     },

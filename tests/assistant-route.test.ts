@@ -14,7 +14,7 @@ const {
   verifyAssistantSession,
   getStaff,
 } = vi.hoisted(() => {
-  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
+  const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn(), adviseJob: vi.fn() };
   const validateEmailGoal = vi.fn((purpose: string) => purpose);
   return {
     assistantRateLimit: vi.fn((_: unknown, action: "request" | "search" | "summary" | "draft") => ({
@@ -76,6 +76,7 @@ vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
   createOfficeAssistantProof,
   ProofGoalClarificationError: class ProofGoalClarificationError extends Error {},
   ProofEmailSuggestionError: class ProofEmailSuggestionError extends Error {},
+  ProofJobAdviceError: class ProofJobAdviceError extends Error {},
   validateEmailGoal,
   ProofResolutionError: class ProofResolutionError extends Error {},
   ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
@@ -83,6 +84,10 @@ vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
 vi.mock("@/lib/openai/proof-summarizer", () => ({
   OpenAIProofError: class OpenAIProofError extends Error {},
   createOpenAIProofSummarizer: () => ({ summarize: vi.fn() }),
+}));
+vi.mock("@/lib/openai/job-advisor", () => ({
+  OpenAIJobAdviceError: class OpenAIJobAdviceError extends Error {},
+  createOpenAIJobAdvisor: () => ({ advise: vi.fn() }),
 }));
 
 import { OPTIONS, POST } from "@/app/assistant/route";
@@ -382,20 +387,64 @@ describe("assistant proof route", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBeNull();
   });
 
-  it("asks for the purpose before drafting an email from a conversational request", async () => {
+  it("uses the selected Job notes for an explicit conversational email request", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Confirm the current measure position.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: { subject: "10 Queen Street (R260766) – Job follow-up", body: "Could you please confirm the current measure position?", citations: ["job:record", "note:1"] },
+      coverage: { included: ["core Job/customer fields", "Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
     const response = await POST(request({
       session: "valid-session",
       message: "Draft me an email for R260766",
     }));
 
     expect(response.status).toBe(200);
-    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "Draft me an email for R260766", true);
     expect(proof.draftEmail).not.toHaveBeenCalled();
     const body = await response.text();
-    expect(body).toContain("Draft me an email for R260766");
-    expect(body).toContain("What should the email achieve?");
-    expect(body).toContain('name="jobNumber" value="R260766"');
-    expect(body).toContain("Nothing will be sent");
+    expect(body).toContain("Review-only email draft");
+    expect(body).toContain("Site measure postponed.");
+    expect(body).not.toContain('name="emailRecipient"');
+  });
+
+  it("returns a next-step recommendation without an email when staff ask what next", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Confirm the current measure position.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: null,
+      coverage: { included: ["core Job/customer fields", "Job diary notes"], excluded: ["email", "SMS"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const response = await POST(request({ session: "valid-session", message: "What should we do next for R260766?" }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "What should we do next for R260766?", false);
+    const body = await response.text();
+    expect(body).toContain("Confirm the current measure position.");
+    expect(body).toContain("Not checked: email, SMS");
+    expect(body).not.toContain("Review-only email draft");
+  });
+
+  it("keeps the selected Job for a conversational follow-up without guessing a new Job", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Review the site measure record.", suggestedContact: "internal",
+        source: { id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: null,
+      coverage: { included: ["Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const response = await POST(request({ session: "valid-session", contextJobNumber: "R260766", message: "What next?" }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", "What next?", false);
+    expect(await response.text()).toContain('name="contextJobNumber" value="R260766"');
+  });
+
+  it("rejects malformed selected Job context before ServiceM8 access", async () => {
+    const response = await POST(request({ session: "valid-session", contextJobNumber: "../../R260766", message: "What next?" }));
+    expect(response.status).toBe(400);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).not.toHaveBeenCalled();
   });
 
   it("does not read ServiceM8 for unsupported or autonomous requests", async () => {
@@ -409,10 +458,32 @@ describe("assistant proof route", () => {
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
     expect(proof.draftEmail).not.toHaveBeenCalled();
     const body = await response.text();
-    expect(body).toContain("Ask what happened to the Job, or ask for an email draft.");
+    expect(body).toContain("Ask what happened, what to do next, or for an email draft for one Job.");
     expect(body).toContain('name="message"');
     expect(body).not.toContain('name="query"');
     expect(body).not.toContain("Send email");
+  });
+
+  it("does not turn an ambiguous message request into an email", async () => {
+    const response = await POST(request({ session: "valid-session", message: "Write a message for R260766" }));
+    expect(response.status).toBe(200);
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.adviseJob).not.toHaveBeenCalled();
+    expect(await response.text()).toContain("Ask what happened, what to do next, or for an email draft");
+  });
+
+  it("treats a request to summarize in an email as one email task", async () => {
+    proof.adviseJob.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      recommendation: { nextAction: "Check whether the cited Job note still needs a follow-up with the customer.", suggestedContact: "customer",
+        source: { id: "note:1", at: null, text: "Site measure postponed." }, quote: "Site measure postponed." },
+      draft: { subject: "Job R260766", body: "Could you please confirm the current position for Job R260766?", citations: ["job:record", "note:1"] },
+      coverage: { included: ["Job diary notes"], excluded: ["email"], noteCount: 1, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const message = "Draft an email summarizing what happened to R260766";
+    const response = await POST(request({ session: "valid-session", message }));
+    expect(response.status).toBe(200);
+    expect(proof.adviseJob).toHaveBeenCalledWith("R260766", message, true);
   });
 
   it("does not read ServiceM8 when a conversation names more than one Job", async () => {
