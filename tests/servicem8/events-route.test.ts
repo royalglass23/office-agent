@@ -1,7 +1,7 @@
 import { SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistantGreetingSession, issueAssistantSession, requireVendorAccount, loadPhaseZeroJobContext, safeLog } = vi.hoisted(() => ({
+const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistantGreetingSession, issueAssistantSession, requireVendorAccount, loadPhaseZeroJobContext, safeLog, isJobDiaryCoverageVerified } = vi.hoisted(() => ({
   consumeEventHash: vi.fn(async () => true),
   clientConstructor: vi.fn(),
   getConfig: vi.fn(() => ({
@@ -23,6 +23,7 @@ const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistant
     companyName: "Example Client",
   })),
   safeLog: vi.fn(),
+  isJobDiaryCoverageVerified: vi.fn(() => true),
 }));
 
 vi.mock("@/lib/config", () => ({ getConfig }));
@@ -42,6 +43,7 @@ vi.mock("@/lib/servicem8/client", () => ({
   requireVendorAccount,
 }));
 vi.mock("@/lib/servicem8/job-context", () => ({ loadPhaseZeroJobContext }));
+vi.mock("@/lib/servicem8/job-diary-gate", () => ({ isJobDiaryCoverageVerified }));
 
 import { POST } from "@/app/api/servicem8/events/route";
 
@@ -75,6 +77,7 @@ async function signFresh() {
 describe("ServiceM8 event route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isJobDiaryCoverageVerified.mockReturnValue(true);
     getConfig.mockReturnValue({
       appBaseUrl: new URL("https://office.example.test"),
       serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
@@ -82,6 +85,19 @@ describe("ServiceM8 event route", () => {
       allowedAccountUUID: event.auth.accountUUID,
       assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
     });
+  });
+
+  it("withholds the Phase 0 Job context while Diary coverage is unverified", async () => {
+    isJobDiaryCoverageVerified.mockReturnValue(false);
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await signFresh(),
+    }));
+    expect(response.status).toBe(503);
+    const result = await response.json();
+    expect(result.eventResponse).toContain("Job Diary coverage incomplete");
+    expect(loadPhaseZeroJobContext).not.toHaveBeenCalled();
+    expect(clientConstructor).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid signature before storage or API access", async () => {

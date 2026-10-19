@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { uuidSchema } from "./servicem8/event-schema";
 
-const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes", "read_staff"] as const;
+const requiredScopes = ["vendor", "read_jobs", "read_customers", "read_job_notes", "read_staff", "read_email", "read_schedule", "read_attachments"] as const;
 
 const envSchema = z.object({
   APP_BASE_URL: z.url().refine((url) => url.startsWith("https://"), "must use HTTPS"),

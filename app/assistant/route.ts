@@ -23,6 +23,7 @@ import {
   validateEmailGoal,
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
+import { isJobDiaryCoverageVerified, jobDiaryGateMessage } from "@/lib/servicem8/job-diary-gate";
 import {
   renderEmailDraft,
   renderJobMatches,
@@ -203,6 +204,13 @@ export async function POST(request: Request) {
       ? conversationIntent.jobNumber
       : form.jobNumber;
 
+    if (requestedJobNumber && !isJobDiaryCoverageVerified()) {
+      const nextSession = await issueAssistantSession(
+        identity, config.sessionSigningSecret, new Date(), identity.launchExpiresAt,
+      );
+      return html(renderProofMessage("Job Diary coverage incomplete", jobDiaryGateMessage, actionUrl, nextSession), 503);
+    }
+
     const takeRateLimit = async (action: "search" | "summary" | "draft") => {
       const limit = await consumeRateSlot(action);
       if (!limit) return null;
@@ -341,6 +349,9 @@ export async function POST(request: Request) {
 
     const summaryRateLimit = await takeRateLimit("summary");
     if (summaryRateLimit) return summaryRateLimit;
+    if (!isJobDiaryCoverageVerified()) {
+      return html(renderProofMessage("Job Diary coverage incomplete", jobDiaryGateMessage, actionUrl, nextSession), 503);
+    }
     const answer = await proof.answerWhatHappened(matches[0].jobNumber);
     safeLog("info", "Completed selected Job history proof", logContext);
     return html(renderProofAnswer(answer, actionUrl, nextSession));

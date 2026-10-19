@@ -1,5 +1,10 @@
 # RG Office Assistant
 
+RG-380 currently blocks Job summaries, email drafts and recommendations while the full ServiceM8
+Job Diary UI/API audit and per-Job completeness check are incomplete. The add-on can still open
+and search for a Job. The description below documents the bounded proof behind that release gate;
+it is not a claim that Job outputs are available now.
+
 Bounded read-only ServiceM8 Office Assistant. A fresh, one-time global Add-ons-menu launch binds a
 short-lived server session to the signed staff identity. In the initial Phase 1 conversation, staff
 provide one exact Job number and ask “What happened?” or ask for an email draft. The answer uses

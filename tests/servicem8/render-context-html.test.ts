@@ -20,6 +20,8 @@ describe("renderMenuAssistant", () => {
       "signed-session-token",
       "signed-greeting-token",
     );
+    expect(html).toContain("Job Diary coverage incomplete");
+    expect(html).toContain("Job summaries, email drafts and recommendations are unavailable");
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
     expect(script).toBeDefined();
     const greeting = { textContent: "Opening RG Office Assistant…" };

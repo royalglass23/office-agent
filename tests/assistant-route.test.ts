@@ -13,6 +13,7 @@ const {
   requireVendorAccount,
   verifyAssistantSession,
   getStaff,
+  isJobDiaryCoverageVerified,
 } = vi.hoisted(() => {
   const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn(), adviseJob: vi.fn() };
   const validateEmailGoal = vi.fn((purpose: string) => purpose);
@@ -39,6 +40,7 @@ const {
     validateEmailGoal,
     requireVendorAccount: vi.fn(async () => undefined),
     getStaff: vi.fn(async (staffUUID: string) => ({ first: staffUUID ? "May" : "" })),
+    isJobDiaryCoverageVerified: vi.fn(() => true),
     verifyAssistantSession: vi.fn(async () => ({
       accountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
       staffUUID: "9d914a06-221e-4013-8b4d-2735272710eb",
@@ -54,6 +56,10 @@ vi.mock("@/lib/security/assistant-session", () => ({
   verifyAssistantSession,
 }));
 vi.mock("@/lib/storage/consumed-events", () => ({ consumeEventHash }));
+vi.mock("@/lib/servicem8/job-diary-gate", () => ({
+  isJobDiaryCoverageVerified,
+  jobDiaryGateMessage: "No Job summary, email draft, or recommendation was generated",
+}));
 vi.mock("@/lib/security/safe-log", () => ({
   correlationId: () => "request-id",
   redactIdentifier: () => "redacted",
@@ -105,6 +111,33 @@ describe("assistant proof route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consumeEventHash.mockResolvedValue(true);
+    isJobDiaryCoverageVerified.mockReturnValue(true);
+  });
+
+  it.each([
+    { jobNumber: "R260766" },
+    { jobNumber: "R260766", emailPurpose: "Ask for a site measure update", emailRecipient: "customer" },
+    { jobNumber: "R260766", jobAdvice: "recommend" },
+    { session: "valid-session", message: "What should we do next for R260766?" },
+  ])("withholds Job output while Diary coverage is unverified: %j", async (fields) => {
+    isJobDiaryCoverageVerified.mockReturnValue(false);
+    const formFields: Record<string, string> = { session: "valid-session" };
+    Object.assign(formFields, fields);
+    const response = await POST(request(formFields));
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(body).toContain("Job Diary coverage incomplete");
+    expect(body).toContain("No Job summary, email draft, or recommendation was generated");
+    expect(createOfficeAssistantProof).not.toHaveBeenCalled();
+  });
+
+  it("withholds an auto-selected search result when Diary coverage is unverified", async () => {
+    isJobDiaryCoverageVerified.mockReturnValue(false);
+    proof.searchJobs.mockResolvedValueOnce([{ jobNumber: "R260766", address: "Test address", status: "Work Order" }]);
+    const response = await POST(request({ session: "valid-session", query: "Test address" }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain("Job Diary coverage incomplete");
+    expect(proof.answerWhatHappened).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid session before ServiceM8 access", async () => {
