@@ -63,6 +63,11 @@ export type ProofEmailDrafter = {
   draft(evidence: readonly ProofEvidence[], purpose: string): Promise<{ citations: string[] }>;
 };
 
+export const emailRecipients = ["customer", "builder", "supplier", "internal"] as const;
+export type EmailRecipient = typeof emailRecipients[number];
+export const emailRevisions = ["shorter", "warmer", "more-formal"] as const;
+export type EmailRevision = typeof emailRevisions[number] | "standard";
+
 export class ProofResolutionError extends Error {
   constructor() {
     super("Selected Job could not be resolved uniquely");
@@ -74,6 +79,13 @@ export class ProofSearchTooBroadError extends Error {
   constructor() {
     super("Enter a more specific Job reference");
     this.name = "ProofSearchTooBroadError";
+  }
+}
+
+export class ProofGoalClarificationError extends Error {
+  constructor() {
+    super("State the specific question to ask the customer");
+    this.name = "ProofGoalClarificationError";
   }
 }
 
@@ -124,6 +136,55 @@ function emailObjective(purpose: string) {
     .replace(/\s+(?:because|since|as)\b.*$/i, "")
     .replace(/[.!?]+$/, "")
     .trim();
+}
+
+function isCustomerUpdate(objective: string) {
+  return /^(?:(?:give|provide|send|share|write|draft)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(?:progress\s+)?update|update\s+(?:the\s+)?(?:customer|client))\b/i.test(objective);
+}
+
+function customerFollowUpQuestion(purpose: string) {
+  const raw = /\bask\s+(?:(?:them|the customer|the client)\s+)?(.+)$/i.exec(purpose)?.[1];
+  if (!raw) return null;
+  const withReason = raw.replace(/[.!?]+$/, "").trim();
+  let clause = withReason;
+  for (const match of withReason.matchAll(/\s+(because|now that|given that|since|as)\b/gi)) {
+    const marker = match[1].toLowerCase();
+    const tail = withReason.slice(match.index).trim();
+    if (marker === "as" && (
+      /\b(?:early|late|soon)\s*$/i.test(withReason.slice(0, match.index)) ||
+      /^as\s+(?:early|late|soon)\s+as\b/i.test(tail) ||
+      (/^as\s+(?:(?:the|a|an)\s+)?(?:[\w'-]+\s+){0,5}(?:date|time|day|slot)$/i.test(tail) &&
+        !/\b(?:has|have|had|is|was|were|are|been|approved|received|confirmed|paid|completed|booked|accepted|sent|arrived)\b/i.test(tail))
+    )) continue;
+    if (marker === "since" && /^since\s+(?:last|this)\s+(?:week|month|year|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(tail)) continue;
+    clause = withReason.slice(0, match.index).trim();
+    break;
+  }
+  if (!clause || clause.length > 160) return null;
+  if (/^(?:whether|if)\s+they\s+have\s+any\s+questions$/i.test(clause)) {
+    return "Please let us know if you have any questions.";
+  }
+  const directed = clause.replace(/\bthey\b/gi, "you").replace(/\bthem\b/gi, "you").replace(/\btheir\b/gi, "your");
+  if (/^(?:whether|if|when|what|where|which|how)\b/i.test(directed)) {
+    return `Could you please let us know ${directed}?`;
+  }
+  if (/^for\s+(?:your|the|an?)\s+\S/i.test(directed)) {
+    return `Could you please share ${directed.replace(/^for\s+/i, "")}?`;
+  }
+  if (/^to\s+(?:confirm|share|provide|send|tell|approve|review|choose|suggest)\b/i.test(directed)) {
+    return `Could you please ${directed.replace(/^to\s+/i, "")}?`;
+  }
+  return null;
+}
+
+export function validateEmailGoal(requestedPurpose: string, recipient: EmailRecipient) {
+  const purpose = normalizeText(requestedPurpose.trim());
+  if (!purpose || purpose.length > 500) throw new Error("Email purpose is invalid");
+  if (recipient === "customer" && isCustomerUpdate(emailObjective(purpose)) &&
+      /\bask\b/i.test(purpose) && !customerFollowUpQuestion(purpose)) {
+    throw new ProofGoalClarificationError();
+  }
+  return purpose;
 }
 
 function emailSubject(jobNumber: string, objective: string) {
@@ -195,6 +256,8 @@ function buildEmailDraft(
   job: ProofJob,
   company: ProofCompany,
   purpose: string,
+  recipient: EmailRecipient,
+  revision: EmailRevision,
 ) {
   const references = new Set(evidence.map((item) => item.id));
   const selected = selection.citations;
@@ -222,29 +285,47 @@ function buildEmailDraft(
     ? selectedNotes.find((note) => confirmedMeasure.test(note.text))
     : undefined;
   const objective = emailObjective(purpose);
-  const customerUpdate = /^(?:give|provide|send)\s+(?:the\s+)?(?:customer|client)\s+(?:an?\s+)?(?:progress\s+)?update\b/i.test(objective);
+  const customerUpdate = isCustomerUpdate(objective);
+  const shortAddress = normalizedAddress.length > 70
+    ? `${normalizedAddress.slice(0, 67).replace(/\s+\S*$/, "").trim()}…`
+    : normalizedAddress;
+  const jobReference = shortAddress ? `${shortAddress} (${job.jobNumber})` : job.jobNumber;
   const subject = programmingRequest
-    ? `${job.jobNumber} – ${approvedInEvidence ? "Confirm programming after BC approval" : "Confirm BC status and programming"}`
-    : emailSubject(job.jobNumber, objective);
+    ? `${jobReference} – ${approvedInEvidence ? "Confirm programming after BC approval" : "Confirm BC status and programming"}`
+    : customerUpdate
+    ? `${jobReference} – Progress update`
+    : emailSubject(jobReference, objective);
   const programmingQuestion = approvedInEvidence
     ? "Could you please confirm whether this Job can now be programmed following the BC approval?"
     : "Could you please confirm whether BC approval has been received and whether this Job can now be programmed?";
+  const quoteFollowUp = /\b(?:follow up|follow-up)\b.*\bquote\b|\bquote\b.*\b(?:follow up|follow-up)\b/i.test(purpose);
+  const customerQuestion = customerUpdate ? customerFollowUpQuestion(purpose) : null;
   const request = customerUpdate
     ? "I wanted to share an update on your Job."
+    : quoteFollowUp
+    ? recipient === "customer"
+      ? "Could you let us know whether you have received a quote for this Job and if you have any questions about the next step?"
+      : "Could you please confirm the current quote position for this Job and any next steps?"
     : programmingRequest
     ? programmingQuestion
+    : recipient === "builder" && /\bcoordinat(?:e|ion)\b/i.test(objective)
+    ? "Could you please confirm the site timing, access requirements, and next step for your team?"
+    : recipient === "supplier" && /\bcoordinat(?:e|ion)\b/i.test(objective)
+    ? "Could you please confirm material availability, delivery timing, and the next step for your team?"
     : `Could you please ${objective.replace(/^./, (letter) => letter.toLowerCase())}?`;
   const updates = [
     customerUpdate && job.status ? `The Job is recorded as ${normalizeText(job.status)}.` : "",
     siteMeasureNote ? "Our records show the site measure is complete." : "",
     customerUpdate && programmingRequest ? programmingQuestion : "",
+    customerUpdate ? customerQuestion : "",
   ].filter(Boolean);
   const prefix = [
-    "Hello,",
+    recipient === "internal" ? "Hi team," : revision === "more-formal" ? "Dear team," : "Hello,",
     "",
-    `I'm writing regarding Job ${job.jobNumber}${address}.`,
+    ...(revision === "warmer" ? ["I hope you're well.", ""] : []),
+    ...(revision === "shorter" ? [] : [`I'm writing regarding Job ${job.jobNumber}${address}.`]),
   ].join("\n") + "\n\n";
-  const suffix = "\n\nKind regards,\nRoyal Glass";
+  const suffix = revision === "shorter" ? "\n\nThanks,\nRoyal Glass" : "\n\nKind regards,\nRoyal Glass";
   const citedNotes = new Set<string>();
   if (siteMeasureNote) citedNotes.add(siteMeasureNote.id);
   if (programmingRequest && approvedInEvidence) {
@@ -382,17 +463,20 @@ export function createOfficeAssistantProof({ reader, summarizer, drafter, now = 
       };
     },
 
-    async draftEmail(requestedJobNumber: string, requestedPurpose: string) {
+    async draftEmail(requestedJobNumber: string, requestedPurpose: string, recipient: EmailRecipient = "customer", revision: EmailRevision = "standard") {
       if (!drafter) throw new Error("Email drafting is not configured");
-      const purpose = normalizeText(requestedPurpose.trim());
-      if (!purpose || purpose.length > 500) throw new Error("Email purpose is invalid");
+      if (!emailRecipients.includes(recipient)) throw new Error("Email recipient is invalid");
+      if (revision !== "standard" && !emailRevisions.includes(revision as typeof emailRevisions[number])) throw new Error("Email revision is invalid");
+      const purpose = validateEmailGoal(requestedPurpose, recipient);
       const { job, company, evidence, coverage } = await selectedJobEvidence(requestedJobNumber);
       const selection = await drafter.draft(evidence, purpose);
-      const draft = buildEmailDraft(selection, evidence, job, company, purpose);
+      const draft = buildEmailDraft(selection, evidence, job, company, purpose, recipient, revision);
       return {
         job: { jobNumber: job.jobNumber, address: job.address, customerName: company.name },
         purpose,
+        recipient,
         draft,
+        sources: draft.citations.map((id) => evidence.find((item) => item.id === id)).filter((item): item is ProofEvidence => item !== undefined),
         coverage,
       };
     },

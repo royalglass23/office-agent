@@ -12,8 +12,12 @@ import { correlationId, redactIdentifier, safeLog } from "@/lib/security/safe-lo
 import { ServiceM8ApiError, ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import {
   createOfficeAssistantProof,
+  emailRecipients,
+  emailRevisions,
+  ProofGoalClarificationError,
   ProofResolutionError,
   ProofSearchTooBroadError,
+  validateEmailGoal,
 } from "@/lib/servicem8/office-assistant-proof";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
 import {
@@ -75,17 +79,19 @@ async function readForm(request: Request) {
     if (restartValues.length !== 1 || restartValues[0] !== "1" || form.size !== 2) {
       throw new AssistantInputError("Invalid restart request");
     }
-    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, emailPurpose: undefined };
+    return { session, restart: true, message: undefined, query: undefined, jobNumber: undefined, emailPurpose: undefined, emailRecipient: undefined, emailRevision: undefined };
   }
   const queryValues = form.getAll("query").filter((value) => value.trim().length > 0);
   const jobValues = form.getAll("jobNumber").filter((value) => value.trim().length > 0);
   const purposeValues = form.getAll("emailPurpose");
+  const recipientValues = form.getAll("emailRecipient");
+  const revisionValues = form.getAll("emailRevision");
   const messageValues = form.getAll("message").filter((value) => value.trim().length > 0);
   if (messageValues.length > 1 || (messageValues.length === 1 && messageValues[0].length > 500)) {
     throw new AssistantInputError("Invalid message");
   }
   if (messageValues.length === 1) {
-    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0) {
+    if (queryValues.length > 0 || jobValues.length > 0 || purposeValues.length > 0 || recipientValues.length > 0 || revisionValues.length > 0) {
       throw new AssistantInputError("Choose a message or one proof action");
     }
     return { session, message: messageValues[0].trim() };
@@ -97,11 +103,21 @@ async function readForm(request: Request) {
     throw new AssistantInputError("Invalid email purpose");
   }
   if (purposeValues.length === 1 && jobValues.length !== 1) throw new AssistantInputError("Email draft requires one Job");
+  if (purposeValues.length === 1 && (recipientValues.length !== 1 || !emailRecipients.includes(recipientValues[0] as typeof emailRecipients[number]))) {
+    throw new AssistantInputError("Choose an email recipient");
+  }
+  if (purposeValues.length === 0 && recipientValues.length > 0) throw new AssistantInputError("Email recipient requires a draft");
+  if (revisionValues.length > 1 || (revisionValues.length === 1 && !emailRevisions.includes(revisionValues[0] as typeof emailRevisions[number]))) {
+    throw new AssistantInputError("Invalid email revision");
+  }
+  if (revisionValues.length === 1 && purposeValues.length !== 1) throw new AssistantInputError("Email revision requires a draft");
   return {
     session,
     query: queryValues[0]?.trim(),
     jobNumber: jobValues[0],
     emailPurpose: purposeValues[0]?.trim(),
+    emailRecipient: recipientValues[0] as typeof emailRecipients[number] | undefined,
+    emailRevision: revisionValues[0] as typeof emailRevisions[number] | undefined,
     message: undefined,
   };
 }
@@ -202,6 +218,27 @@ export async function POST(request: Request) {
     );
     if (initialRateLimit) return initialRateLimit;
 
+    if (form.emailPurpose && form.emailRecipient) {
+      try {
+        validateEmailGoal(form.emailPurpose, form.emailRecipient);
+      } catch (error) {
+        if (!(error instanceof ProofGoalClarificationError)) throw error;
+        const clarificationSession = await issueAssistantSession(
+          identity,
+          config.sessionSigningSecret,
+          new Date(),
+          identity.launchExpiresAt,
+        );
+        return html(renderConversationDraftPrompt(
+          form.emailPurpose,
+          form.jobNumber!,
+          actionUrl,
+          clarificationSession,
+          "What exact question should this email ask? Please include it in the goal below.",
+        ));
+      }
+    }
+
     const logContext = {
       requestId,
       account: redactIdentifier(identity.accountUUID),
@@ -228,7 +265,7 @@ export async function POST(request: Request) {
     );
 
     if (form.jobNumber && form.emailPurpose) {
-      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose);
+      const result = await proof.draftEmail(form.jobNumber, form.emailPurpose, form.emailRecipient, form.emailRevision);
       safeLog("info", "Completed selected Job email draft proof", logContext);
       return html(renderEmailDraft(result, actionUrl, nextSession));
     }

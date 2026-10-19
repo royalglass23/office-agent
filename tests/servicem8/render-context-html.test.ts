@@ -170,6 +170,7 @@ describe("proof result rendering", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
     expect(html).toContain('name="emailPurpose"');
+    expect(html).toContain('name="emailRecipient"');
     expect(html).toContain('value="R260766"');
     expect(html).toContain("Draft email");
     expect(html).toContain("Nothing will be sent");
@@ -179,11 +180,13 @@ describe("proof result rendering", () => {
     const html = renderEmailDraft({
       job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
       purpose: "Follow up on the measure",
+      recipient: "builder",
       draft: {
         subject: "<script>alert('subject')</script>",
         body: "Hi Example,\n<script>alert('body')</script>",
         citations: ["job:record", "note:1"],
       },
+      sources: [{ id: "note:1", at: "2026-10-13T00:00:00.000Z", text: "Measure <pending>" }],
       coverage: {
         included: ["core Job/customer fields", "Job diary notes"],
         excluded: ["email", "SMS", "forms", "attachments", "schedule activity"],
@@ -199,6 +202,12 @@ describe("proof result rendering", () => {
     expect(html).toContain("&lt;script&gt;alert(&#39;body&#39;)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert('body')</script>");
     expect(html).not.toContain("Send email");
+    expect(html).toContain('id="draftSubject"');
+    expect(html).toContain('id="draftBody"');
+    expect(html).toContain('name="emailRevision"');
+    expect(html).toContain("Revise draft");
+    expect(html).toContain('name="emailRecipient" value="builder"');
+    expect(html).toContain("Measure &lt;pending&gt;");
     expect(html).toContain("Not checked: email, SMS, forms, attachments, schedule activity");
     expect(html).toContain('name="message"');
     expect(html).toContain("Ask another question");

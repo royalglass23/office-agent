@@ -9,11 +9,13 @@ const {
   getConfig,
   issueAssistantSession,
   proof,
+  validateEmailGoal,
   requireVendorAccount,
   verifyAssistantSession,
   getStaff,
 } = vi.hoisted(() => {
   const proof = { searchJobs: vi.fn(), answerWhatHappened: vi.fn(), draftEmail: vi.fn() };
+  const validateEmailGoal = vi.fn((purpose: string) => purpose);
   return {
     assistantRateLimit: vi.fn((_: unknown, action: "request" | "search" | "summary" | "draft") => ({
       hashes: Array.from(
@@ -34,6 +36,7 @@ const {
     })),
     issueAssistantSession: vi.fn(async () => "next-session-token"),
     proof,
+    validateEmailGoal,
     requireVendorAccount: vi.fn(async () => undefined),
     getStaff: vi.fn(async (staffUUID: string) => ({ first: staffUUID ? "May" : "" })),
     verifyAssistantSession: vi.fn(async () => ({
@@ -68,7 +71,11 @@ vi.mock("@/lib/servicem8/proof-reader", () => ({
   ServiceM8ProofReader: class ServiceM8ProofReader {},
 }));
 vi.mock("@/lib/servicem8/office-assistant-proof", () => ({
+  emailRecipients: ["customer", "builder", "supplier", "internal"],
+  emailRevisions: ["shorter", "warmer", "more-formal"],
   createOfficeAssistantProof,
+  ProofGoalClarificationError: class ProofGoalClarificationError extends Error {},
+  validateEmailGoal,
   ProofResolutionError: class ProofResolutionError extends Error {},
   ProofSearchTooBroadError: class ProofSearchTooBroadError extends Error {},
 }));
@@ -78,7 +85,7 @@ vi.mock("@/lib/openai/proof-summarizer", () => ({
 }));
 
 import { OPTIONS, POST } from "@/app/assistant/route";
-import { ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
+import { ProofGoalClarificationError, ProofResolutionError, ProofSearchTooBroadError } from "@/lib/servicem8/office-assistant-proof";
 
 function request(fields: Record<string, string>) {
   return new Request("https://office.example.test/assistant", {
@@ -455,14 +462,64 @@ describe("assistant proof route", () => {
       session: "valid-session",
       jobNumber: "R260766",
       emailPurpose: "Follow up on the site measure",
+      emailRecipient: "customer",
     }));
 
     expect(response.status).toBe(200);
-    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure");
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", "Follow up on the site measure", "customer", undefined);
     expect(proof.answerWhatHappened).not.toHaveBeenCalled();
     const body = await response.text();
     expect(body).toContain("Site measure follow-up");
     expect(body).toContain("nothing was sent");
     expect(body).not.toContain("Send email");
+  });
+
+  it("requires a supported recipient before reading a Job for a draft", async () => {
+    for (const emailRecipient of [undefined, "unknown"]) {
+      const response = await POST(request({
+        session: "valid-session",
+        jobNumber: "R260766",
+        emailPurpose: "Give the customer a progress update",
+        ...(emailRecipient ? { emailRecipient } : {}),
+      }));
+      expect(response.status).toBe(400);
+    }
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
+  });
+
+  it("routes a supported revision while rejecting unknown styles before a Job read", async () => {
+    proof.draftEmail.mockResolvedValueOnce({
+      job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },
+      purpose: "Give the customer a progress update",
+      recipient: "customer",
+      draft: { subject: "10 Queen Street (R260766) – Progress update", body: "Hello,", citations: ["job:record"] },
+      coverage: { included: ["core Job/customer fields"], excluded: ["email"], noteCount: 0, truncated: false, snapshotAt: "2026-10-13T00:00:00.000Z" },
+    });
+    const fields = { session: "valid-session", jobNumber: "R260766", emailPurpose: "Give the customer a progress update", emailRecipient: "customer" };
+    expect((await POST(request({ ...fields, emailRevision: "shorter" }))).status).toBe(200);
+    expect(proof.draftEmail).toHaveBeenCalledWith("R260766", fields.emailPurpose, "customer", "shorter");
+    vi.clearAllMocks();
+    expect((await POST(request({ ...fields, emailRevision: "unbounded" }))).status).toBe(400);
+    expect(clientConstructor).not.toHaveBeenCalled();
+  });
+
+  it("asks for the exact customer question when the goal is too vague", async () => {
+    validateEmailGoal.mockImplementationOnce(() => { throw new ProofGoalClarificationError(); });
+    const response = await POST(request({
+      session: "valid-session",
+      jobNumber: "R260766",
+      emailRecipient: "customer",
+      emailPurpose: "Update the customer and ask about timing",
+    }));
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("What exact question should this email ask?");
+    expect(body).toContain('name="jobNumber" value="R260766"');
+    expect(body).toContain('name="session" value="next-session-token"');
+    expect(body).not.toContain("Email draft —");
+    expect(clientConstructor).not.toHaveBeenCalled();
+    expect(requireVendorAccount).not.toHaveBeenCalled();
+    expect(proof.draftEmail).not.toHaveBeenCalled();
   });
 });

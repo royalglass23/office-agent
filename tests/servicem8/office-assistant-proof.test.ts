@@ -121,11 +121,11 @@ describe("bounded Office Assistant proof", () => {
       now: () => new Date("2026-10-13T00:00:00Z"),
     });
 
-    await expect(proof.draftEmail("R260766", "Follow up after the site measure")).resolves.toEqual({
+    await expect(proof.draftEmail("R260766", "Follow up after the site measure")).resolves.toMatchObject({
       job: { jobNumber: "R260766", address: "10 Queen Street, Auckland", customerName: "Example Customer" },
       purpose: "Follow up after the site measure",
       draft: {
-        subject: "R260766 – Site measure follow-up",
+        subject: "10 Queen Street, Auckland (R260766) – Site measure follow-up",
         body: [
           "Hello,",
           "",
@@ -153,6 +153,144 @@ describe("bounded Office Assistant proof", () => {
       "Follow up after the site measure",
     );
     expect(proofReader.getJob).toHaveBeenCalledWith(jobOne.uuid);
+  });
+
+  it("addresses an internal handover and falls back to the Job number when the address is absent", async () => {
+    const noAddress = { ...jobOne, address: "" };
+    const proof = createOfficeAssistantProof({
+      reader: reader({
+        listJobsByNumber: vi.fn(async () => [noAddress]),
+        getJob: vi.fn(async () => noAddress),
+      }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+
+    const result = await proof.draftEmail("R260766", "Confirm the next site visit", "internal");
+    expect(result.recipient).toBe("internal");
+    expect(result.draft.subject).toBe("R260766 – Confirm next site visit");
+    expect(result.draft.body).toContain("Hi team,");
+    expect(result.sources).toEqual(expect.arrayContaining([expect.objectContaining({ id: "job:record" })]));
+  });
+
+  it("sends the customer a progress update and asks the requested question", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Update the customer and ask whether they have any questions", "customer");
+    expect(result.draft.body).toContain("I wanted to share an update on your Job.");
+    expect(result.draft.body).toContain("Our records show the site measure is complete.");
+    expect(result.draft.body).toContain("Please let us know if you have any questions.");
+    expect(result.draft.body).not.toContain("please update the customer");
+  });
+
+  it.each([
+    ["Give the customer a progress update and ask whether Friday works", "Could you please let us know whether Friday works?"],
+    ["Update the customer and ask what date suits them", "Could you please let us know what date suits you?"],
+    ["Send the customer an update and ask them to confirm the site access time", "Could you please confirm the site access time?"],
+    ["Give the customer a progress update and ask for their preferred installation date", "Could you please share your preferred installation date?"],
+    ["Give the customer a progress update and ask them to approve the revised schedule", "Could you please approve the revised schedule?"],
+    ["Update the customer and ask whether they can meet as early as Friday", "Could you please let us know whether you can meet as early as Friday?"],
+  ])("keeps the specific question in a customer update: %s", async (purpose, question) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", purpose, "customer");
+    expect(result.draft.body).toContain("I wanted to share an update on your Job.");
+    expect(result.draft.body).toContain(question);
+    expect(result.draft.body).not.toContain("please ask");
+  });
+
+  it.each([
+    "because the quote has been approved",
+    "since the quote has been approved",
+    "as the quote has been approved",
+    "now that the quote has been approved",
+    "given that the quote has been approved",
+    "since BC approval was received",
+    "as BC has been approved",
+    "since Matt approved the quote",
+  ])("does not repeat an unverified causal claim: %s", async (reason) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail(
+      "R260766", `Give the customer a progress update and ask whether Friday works ${reason}`, "customer",
+    );
+    expect(result.draft.body).toContain("Could you please let us know whether Friday works?");
+    expect(result.draft.body).not.toContain("quote has been approved");
+    expect(result.draft.body).not.toContain(reason);
+    expect(result.draft.subject).toBe("10 Queen Street, Auckland (R260766) – Progress update");
+  });
+
+  it("keeps a proposed date role without treating it as a causal claim", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail(
+      "R260766", "Give the customer a progress update and ask whether Friday works as the installation date", "customer",
+    );
+    expect(result.draft.body).toContain("Could you please let us know whether Friday works as the installation date?");
+  });
+
+  it("stops before reading Job evidence when a requested customer question is too vague", async () => {
+    const proofReader = reader();
+    const drafter = vi.fn(async () => ({ citations: ["job:record"] }));
+    const proof = createOfficeAssistantProof({
+      reader: proofReader, summarizer: { summarize: vi.fn() }, drafter: { draft: drafter },
+    });
+    await expect(proof.draftEmail("R260766", "Update the customer and ask about timing", "customer"))
+      .rejects.toThrow("State the specific question");
+    expect(proofReader.listJobsByNumber).not.toHaveBeenCalled();
+    expect(drafter).not.toHaveBeenCalled();
+  });
+
+  it.each(["builder", "supplier"] as const)("uses a %s coordination request", async (recipient) => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Coordinate next steps for the Job", recipient);
+    expect(result.draft.body).toContain(recipient === "builder" ? "site timing, access requirements" : "material availability, delivery timing");
+    expect(result.draft.body).not.toContain("please coordinate next steps");
+  });
+
+  it("asks a customer about their quote questions without claiming a sent quote or missing reply", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Follow up with the customer about the quote", "customer");
+    expect(result.draft.body).toContain("whether you have received a quote");
+    expect(result.draft.body).not.toContain("confirm the current quote position");
+    expect(result.draft.body).not.toContain("we have not heard");
+  });
+
+  it("keeps a shared or long address subject identifiable and editable", async () => {
+    const longAddress = `${"Long Road ".repeat(45)}Auckland`;
+    const longJob = { ...jobOne, address: longAddress };
+    const proof = createOfficeAssistantProof({
+      reader: reader({ listJobsByNumber: vi.fn(async () => [longJob]), getJob: vi.fn(async () => longJob) }),
+      summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["job:record"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Request an update", "customer");
+    expect(result.draft.subject).toContain("(R260766)");
+    expect(result.draft.subject.length).toBeLessThanOrEqual(200);
+  });
+
+  it("can produce a shorter revision from the same selected Job evidence", async () => {
+    const proof = createOfficeAssistantProof({
+      reader: reader(), summarizer: { summarize: vi.fn() },
+      drafter: { draft: async () => ({ citations: ["note:1"] }) },
+    });
+    const result = await proof.draftEmail("R260766", "Give the customer a progress update", "customer", "shorter");
+    expect(result.draft.body).not.toContain("I'm writing regarding");
+    expect(result.draft.body).toContain("Our records show the site measure is complete.");
   });
 
   it("uses and cites a selected diary fact in the draft", async () => {
@@ -254,7 +392,7 @@ describe("bounded Office Assistant proof", () => {
       drafter: { draft: async () => ({ citations: ["note:1"] }) },
     });
     const result = await proof.draftEmail("R260766", "Ask Matt to confirm whether the Job can now be programmed because the BC has been approved.");
-    expect(result.draft.subject).toMatch(/R260766.*programming.*BC/i);
+    expect(result.draft.subject).toMatch(/10 Queen Street.*programming.*BC/i);
     expect(result.draft.subject.length).toBeLessThan(80);
     expect(result.draft.body).toContain("Hello,");
     expect(result.draft.body).toMatch(/please confirm whether.*programmed/i);
@@ -355,14 +493,14 @@ describe("bounded Office Assistant proof", () => {
     });
     const purpose = "Ask Matt to confirm the installation date because the glass has arrived.";
     const result = await proof.draftEmail("R260766", purpose);
-    expect(result.draft.subject).toBe("R260766 – Confirm installation date");
+    expect(result.draft.subject).toBe("10 Queen Street, Auckland (R260766) – Confirm installation date");
     expect(result.draft.subject).not.toContain("because the glass has arrived");
     expect(result.draft.body).toContain("confirm the installation date");
   });
 
   it.each([
-    ["Request an update", "R260766 – Update request"],
-    ["Give the customer a progress update", "R260766 – Progress update"],
+    ["Request an update", "10 Queen Street, Auckland (R260766) – Update request"],
+    ["Give the customer a progress update", "10 Queen Street, Auckland (R260766) – Progress update"],
   ])("creates a concise subject for %s", async (purpose, expectedSubject) => {
     const proof = createOfficeAssistantProof({
       reader: reader(), summarizer: { summarize: vi.fn() },
@@ -379,7 +517,7 @@ describe("bounded Office Assistant proof", () => {
     });
     const purpose = "Discuss the revised quote with Matt before arranging a call.";
     const result = await proof.draftEmail("R260766", purpose);
-    expect(result.draft.subject).toBe("R260766 – Regarding revised quote");
+    expect(result.draft.subject).toBe("10 Queen Street, Auckland (R260766) – Regarding revised quote");
     expect(result.draft.subject).not.toContain("Matt");
     expect(result.draft.body).toContain("discuss the revised quote with Matt");
   });
@@ -391,13 +529,13 @@ describe("bounded Office Assistant proof", () => {
     });
     const purpose = "Reschedule the site visit with Matt before Friday.";
     const result = await proof.draftEmail("R260766", purpose);
-    expect(result.draft.subject).toBe("R260766 – Reschedule site visit");
+    expect(result.draft.subject).toBe("10 Queen Street, Auckland (R260766) – Reschedule site visit");
     expect(result.draft.body).toContain("reschedule the site visit with Matt before Friday");
   });
 
   it.each([
-    ["Follow up with Matt about the revised quote.", "R260766 – Revised quote follow-up"],
-    ["Resolve scheduling conflict for next week's install.", "R260766 – Resolve scheduling conflict"],
+    ["Follow up with Matt about the revised quote.", "10 Queen Street, Auckland (R260766) – Revised quote follow-up"],
+    ["Resolve scheduling conflict for next week's install.", "10 Queen Street, Auckland (R260766) – Resolve scheduling conflict"],
   ])("keeps a concise topic for unmatched purpose %s", async (purpose, expectedSubject) => {
     const proof = createOfficeAssistantProof({
       reader: reader(), summarizer: { summarize: vi.fn() },
