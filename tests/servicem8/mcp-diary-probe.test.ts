@@ -29,6 +29,16 @@ describe("one-time staging MCP Diary probe", () => {
     expect(url.toString()).not.toContain(state.verifier);
   });
 
+  it("accepts the signed launch identity without carrying unrelated session fields into OAuth state", () => {
+    vi.stubEnv("SERVICEM8_MCP_CLIENT_ID", "staging-client");
+    const launchIdentity = { ...identity, launchExpiresAt: 1_900_000_000, launch: "global-menu" };
+    const url = prepareMcpProbe(launchIdentity, origin, key, 1_800_000_000_000);
+    const state = readMcpProbeState(url.searchParams.get("state")!, key, 1_800_000_001_000);
+    expect(state).toMatchObject(identity);
+    expect(state).not.toHaveProperty("launchExpiresAt");
+    expect(state).not.toHaveProperty("launch");
+  });
+
   it("is disabled outside the exact staging host", () => {
     vi.stubEnv("SERVICEM8_MCP_CLIENT_ID", "staging-client");
     expect(() => prepareMcpProbe(identity, new URL("https://office-agent-ashy.vercel.app"), key)).toThrow();

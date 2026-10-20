@@ -38,7 +38,9 @@ export function prepareMcpProbe(
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = encryptToken(JSON.stringify(stateSchema.parse({
-    ...identity, verifier, nonce: randomBytes(24).toString("base64url"), expiresAt: now + 10 * 60_000,
+    accountUUID: identity.accountUUID, staffUUID: identity.staffUUID,
+    jobUUID: identity.jobUUID, jobNumber: identity.jobNumber,
+    verifier, nonce: randomBytes(24).toString("base64url"), expiresAt: now + 10 * 60_000,
   })), encryptionKey);
   const url = new URL(AUTHORIZE_URL);
   url.searchParams.set("response_type", "code");
