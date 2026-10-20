@@ -13,6 +13,13 @@ export const dynamic = "force-dynamic";
 const allowedJobs = new Set(["R260766", "R260609", "R260611", "R260445"]);
 const headers = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'none'" };
 function result(status: number, code: string) { return Response.json({ status: code }, { status, headers }); }
+function continueToConsent(authorization: URL) {
+  const href = authorization.toString().replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>ServiceM8 Diary check</title></head><body><main><h1>Ready to check the Job Diary</h1><p>The staff and Job access checks passed. Continue to ServiceM8 to review the requested permissions. No Job has been changed.</p><p><a href="${href}" rel="noreferrer noopener">Continue to ServiceM8</a></p><p>This link expires in 10 minutes. If it expires, reopen RG Office Assistant Staging and start again.</p></main></body></html>`;
+  return new Response(html, { status: 200, headers: {
+    ...headers, "Content-Type": "text/html; charset=utf-8", "X-Content-Type-Options": "nosniff",
+  } });
+}
 
 export async function POST(request: Request) {
   try {
@@ -62,7 +69,7 @@ export async function POST(request: Request) {
     const authorization = prepareMcpProbe({
       ...identity, jobUUID: listed.uuid, jobNumber: jobNumber as "R260766" | "R260609" | "R260611" | "R260445",
     }, config.appBaseUrl, config.tokenEncryptionKey);
-    return new Response(null, { status: 302, headers: { ...headers, Location: authorization.toString() } });
+    return continueToConsent(authorization);
   } catch {
     return result(502, "probe_unavailable");
   }

@@ -47,7 +47,7 @@ beforeEach(() => {
       getJob: vi.fn().mockResolvedValue({ uuid: jobUUID, generated_job_id: "R260609" }),
     };
   });
-  mocks.prepare.mockReturnValue(new URL("https://go.servicem8.com/oauth/authorize?state=encrypted"));
+  mocks.prepare.mockReturnValue(new URL("https://go.servicem8.com/oauth/authorize?state=encrypted&client_id=staging-client"));
   mocks.readState.mockReturnValue({ accountUUID, staffUUID, jobUUID, jobNumber: "R260609", nonce: "nonce", expiresAt: Date.now() + 60_000 });
   mocks.exchange.mockResolvedValue("transient-token");
   mocks.probe.mockResolvedValue({ status: "inventory_only", staffBinding: "unverified", count: 18 });
@@ -65,8 +65,14 @@ describe("staging MCP Diary routes", () => {
     expect((await POST(start())).status).toBe(409);
     expect(mocks.prepare).not.toHaveBeenCalled();
     const response = await POST(start());
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toContain("go.servicem8.com/oauth/authorize");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    const html = await response.text();
+    expect(html).toContain('href="https://go.servicem8.com/oauth/authorize?state=encrypted&amp;client_id=staging-client"');
+    expect(html).toContain("Continue to ServiceM8");
+    expect(html).not.toContain("signed-session");
     expect(mocks.client).toHaveBeenCalledWith(accountUUID, staffUUID);
     expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ jobUUID, jobNumber: "R260609" }), expect.any(URL), "key");
   });
