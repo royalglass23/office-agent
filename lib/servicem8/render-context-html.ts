@@ -137,7 +137,10 @@ function stagingAuditForm(actionUrl: URL, sessionToken: string) {
   if (actionUrl.origin !== "https://office-agent-staging.vercel.app") return "";
   const auditUrl = new URL("/assistant/audit", actionUrl);
   const options = auditJobNumbers.map((jobNumber) => `<option value="${escapeHtml(jobNumber)}">${escapeHtml(jobNumber)}</option>`).join("");
-  return `<section class="search"><h2>RG-380 staff audit</h2><p>Read-only source inventory for the ${auditJobNumbers.length} authorised Jobs. This does not enable Job answers.</p><form data-audit="true" method="post" action="${escapeHtml(auditUrl.toString())}">${hiddenSession(sessionToken)}<label for="audit-job">Job</label><select id="audit-job" name="jobNumber">${options}</select><button type="submit">Run redacted audit</button></form></section>`;
+  const mcpForm = process.env.SERVICEM8_MCP_CLIENT_ID
+    ? `<form data-audit="true" method="post" action="${escapeHtml(new URL("/assistant/mcp/start", actionUrl).toString())}" target="_blank" rel="noopener">${hiddenSession(sessionToken)}<label for="mcp-audit-job">MCP Diary Job</label><select id="mcp-audit-job" name="jobNumber">${options}<option value="R260445">R260445</option></select><button type="submit">Check Diary read</button><p class="privacy">Opens ServiceM8 consent. This staging check only calls the Diary read tool and does not change a Job. Review the permissions ServiceM8 displays.</p></form>`
+    : "";
+  return `<section class="search"><h2>RG-380 staff audit</h2><p>Read-only source inventory for the ${auditJobNumbers.length} authorised Jobs. This does not enable Job answers.</p><form data-audit="true" method="post" action="${escapeHtml(auditUrl.toString())}">${hiddenSession(sessionToken)}<label for="audit-job">Job</label><select id="audit-job" name="jobNumber">${options}</select><button type="submit">Run redacted audit</button></form>${mcpForm}</section>`;
 }
 
 export function renderConversationGuidance(
