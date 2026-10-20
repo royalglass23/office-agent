@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { ServiceM8Event, ServiceM8JobEvent } from "./event-schema";
 import type { PhaseZeroJobContext } from "./job-context";
+import { auditJobNumbers } from "./job-diary-audit";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => {
@@ -135,7 +136,8 @@ function conversationForm(actionUrl: URL, sessionToken: string, selectedJobNumbe
 function stagingAuditForm(actionUrl: URL, sessionToken: string) {
   if (actionUrl.origin !== "https://office-agent-staging.vercel.app") return "";
   const auditUrl = new URL("/assistant/audit", actionUrl);
-  return `<section class="search"><h2>RG-380 staff audit</h2><p>Read-only source inventory for the two authorised Jobs. This does not enable Job answers.</p><form data-audit="true" method="post" action="${escapeHtml(auditUrl.toString())}">${hiddenSession(sessionToken)}<label for="audit-job">Job</label><select id="audit-job" name="jobNumber"><option value="R260766">R260766</option><option value="R260609">R260609</option></select><button type="submit">Run redacted audit</button></form></section>`;
+  const options = auditJobNumbers.map((jobNumber) => `<option value="${escapeHtml(jobNumber)}">${escapeHtml(jobNumber)}</option>`).join("");
+  return `<section class="search"><h2>RG-380 staff audit</h2><p>Read-only source inventory for the ${auditJobNumbers.length} authorised Jobs. This does not enable Job answers.</p><form data-audit="true" method="post" action="${escapeHtml(auditUrl.toString())}">${hiddenSession(sessionToken)}<label for="audit-job">Job</label><select id="audit-job" name="jobNumber">${options}</select><button type="submit">Run redacted audit</button></form></section>`;
 }
 
 export function renderConversationGuidance(
