@@ -414,8 +414,7 @@ describe("bounded Office Assistant proof", () => {
 
   it("recommends from an exact checked note without drafting an email", async () => {
     const advise = vi.fn(async () => ({
-      nextAction: "Review the site measure record before proceeding.", recipient: "internal" as const,
-      question: "Could you please confirm the next action for this Job?",
+      recipient: "internal" as const,
       evidenceId: "note:1", evidenceQuote: "Site measure completed.",
     }));
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: { advise } });
@@ -428,10 +427,17 @@ describe("bounded Office Assistant proof", () => {
     expect(result.coverage.excluded).toContain("email");
   });
 
+  it("accepts the evidence selection without unused model-written prose", async () => {
+    const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
+      advise: async () => ({ recipient: "internal", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
+    } });
+    const result = await proof.adviseJob("R260766");
+    expect(result.recommendation.nextAction).toContain("site measure status");
+  });
+
   it("prepares a question-only draft when staff explicitly ask for email", async () => {
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
-      advise: async () => ({ nextAction: "Review the site measure record before proceeding.", recipient: "internal",
-        question: "Could you please confirm the next action for this Job?", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
+      advise: async () => ({ recipient: "internal", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
     } });
     const result = await proof.adviseJob("R260766", "Draft an email about the next step", true);
     expect(result.draft?.subject).toBe("10 Queen Street, Auckland (R260766) – Job follow-up");
@@ -442,16 +448,14 @@ describe("bounded Office Assistant proof", () => {
 
   it("rejects a model recommendation when its quoted note text does not match", async () => {
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
-      advise: async () => ({ nextAction: "Confirm whether the customer paid.", recipient: "customer",
-        question: "Could you please confirm whether payment has been made?", evidenceId: "note:1", evidenceQuote: "Customer paid in full." }),
+      advise: async () => ({ recipient: "customer", evidenceId: "note:1", evidenceQuote: "Customer paid in full." }),
     } });
     await expect(proof.adviseJob("R260766")).rejects.toThrow("not supported by the checked notes");
   });
 
-  it("never displays unsupported model action or question even with an exact note excerpt", async () => {
+  it("writes a cautious question from an exact note excerpt", async () => {
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
-      advise: async () => ({ nextAction: "Ask the customer to share your login password.", recipient: "customer",
-        question: "Could you please confirm that your overdue deposit has been paid?", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
+      advise: async () => ({ recipient: "customer", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
     } });
     const result = await proof.adviseJob("R260766", "Draft an email to the customer", true);
     expect(result.recommendation.nextAction).toBe("Confirm the current site measure status with the customer before deciding the next step.");
@@ -461,8 +465,7 @@ describe("bounded Office Assistant proof", () => {
 
   it("uses the staff's explicit recipient over a conflicting model contact", async () => {
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
-      advise: async () => ({ nextAction: "Review the site measure record.", recipient: "internal",
-        question: "Could you please confirm the next action?", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
+      advise: async () => ({ recipient: "internal", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
     } });
     const result = await proof.adviseJob("R260766", "Draft an email to the customer", true);
     expect(result.recommendation.suggestedContact).toBe("customer");
@@ -471,8 +474,7 @@ describe("bounded Office Assistant proof", () => {
 
   it("uses the addressed contact rather than a contact mentioned in the topic", async () => {
     const proof = createOfficeAssistantProof({ reader: reader(), summarizer: { summarize: vi.fn() }, advisor: {
-      advise: async () => ({ nextAction: "Review the site measure record.", recipient: "builder",
-        question: "Could you please confirm the next action?", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
+      advise: async () => ({ recipient: "builder", evidenceId: "note:1", evidenceQuote: "Site measure completed." }),
     } });
     const result = await proof.adviseJob("R260766", "Draft an email to the builder about the customer's measurements", true);
     expect(result.recommendation.suggestedContact).toBe("builder");

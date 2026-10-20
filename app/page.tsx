@@ -54,6 +54,10 @@ export default function Home() {
             <dt>Phase 1 conversation</dt>
             <dd>{config.assistantProof.enabled ? "Enabled" : "Disabled"}</dd>
           </div>
+          <div>
+            <dt>Separate Company Check Add-on</dt>
+            <dd>{config.companyCheck.enabled ? "Enabled for signed staff launches" : "Disabled"}</dd>
+          </div>
         </dl>
 
         <p className={styles.note}>

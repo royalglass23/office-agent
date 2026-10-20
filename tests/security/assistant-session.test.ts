@@ -3,8 +3,12 @@ import {
   assistantRateLimit,
   issueAssistantGreetingSession,
   issueAssistantSession,
+  issueCompanyCheckSession,
+  issueCompanyCheckLaunchSession,
   verifyAssistantGreetingSession,
   verifyAssistantSession,
+  verifyCompanyCheckSession,
+  verifyCompanyCheckLaunchSession,
 } from "@/lib/security/assistant-session";
 
 const secret = "assistant-session-test-secret-at-least-thirty-two-bytes";
@@ -14,6 +18,21 @@ const identity = {
 };
 
 describe("staff-bound assistant session", () => {
+  it("keeps company-check credentials separate from assistant action credentials", async () => {
+    const now = new Date("2030-01-01T00:00:00Z");
+    const assistantToken = await issueAssistantSession(identity, secret, now);
+    const launchToken = await issueCompanyCheckLaunchSession(identity, secret, now);
+    const verifiedLaunch = await verifyCompanyCheckLaunchSession(launchToken, secret, now);
+    const companyToken = await issueCompanyCheckSession(verifiedLaunch, secret, now);
+    await expect(verifyCompanyCheckSession(companyToken, secret, new Date("2030-01-01T00:20:00Z"))).resolves.toEqual(identity);
+    await expect(verifyCompanyCheckSession(assistantToken, secret, now)).rejects.toThrow("Company check session is invalid");
+    await expect(verifyAssistantSession(companyToken, secret, now)).rejects.toThrow("Assistant session is invalid");
+    await expect(verifyCompanyCheckLaunchSession(assistantToken, secret, now)).rejects.toThrow("Company check launch session is invalid");
+    await expect(verifyCompanyCheckLaunchSession(companyToken, secret, now)).rejects.toThrow("Company check launch session is invalid");
+    await expect(verifyCompanyCheckLaunchSession(launchToken, secret, new Date("2030-01-01T00:05:31Z"))).rejects.toThrow("Company check launch session is invalid");
+    await expect(verifyCompanyCheckSession(companyToken, secret, new Date("2030-01-01T00:30:31Z"))).rejects.toThrow("Company check session is invalid");
+  });
+
   it("preserves only the verified account and staff identity for thirty minutes", async () => {
     const token = await issueAssistantSession(identity, secret, new Date("2030-01-01T00:00:00Z"));
 

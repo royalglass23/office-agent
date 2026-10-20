@@ -18,8 +18,13 @@ beforeEach(() => {
     SESSION_SIGNING_SECRET: "session-secret-with-at-least-thirty-two-bytes",
   };
   delete process.env.ASSISTANT_PROOF_ENABLED;
+  delete process.env.COMPANY_CHECK_ENABLED;
+  delete process.env.CC_APP_ID;
+  delete process.env.CC_APP_SECRET;
+  delete process.env.NZBN_API_KEY;
   delete process.env.OPENAI_API_KEY;
   delete process.env.OPENAI_MODEL;
+  delete process.env.OPENAI_RESEARCH_MODEL;
   delete process.env.OPENAI_DATA_CONTROLS_VERIFIED;
   resetConfigForTests();
 });
@@ -58,5 +63,22 @@ describe("bounded assistant proof configuration", () => {
       apiKey: "test-key",
       model: "gpt-test",
     });
+  });
+
+  it("keeps the company report independent of the Job proof flag and requires its own model", () => {
+    process.env.COMPANY_CHECK_ENABLED = "true";
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENAI_RESEARCH_MODEL = "research-test";
+    expect(() => getConfig()).toThrow("OPENAI_DATA_CONTROLS_VERIFIED");
+    process.env.OPENAI_DATA_CONTROLS_VERIFIED = "true";
+    expect(() => getConfig()).toThrow("NZBN_API_KEY");
+    process.env.NZBN_API_KEY = "nzbn-test-key";
+    expect(() => getConfig()).toThrow("CC_APP_ID");
+    process.env.CC_APP_ID = "company-check-app-id";
+    expect(() => getConfig()).toThrow("CC_APP_SECRET");
+    process.env.CC_APP_SECRET = "company-check-secret-long-enough";
+    expect(getConfig().assistantProof).toEqual({ enabled: false });
+    expect(getConfig().companyCheck).toEqual({ enabled: true, apiKey: "test-key", model: "research-test",
+      nzbnApiKey: "nzbn-test-key", appId: "company-check-app-id", appSecret: "company-check-secret-long-enough" });
   });
 });

@@ -4,3 +4,9 @@ coverage/
 .env*
 !.env.example
 *.tsbuildinfo
+
+# Local tooling output and disposable previews
+.impeccable/
+.playwright-mcp/
+artifacts/
+output/

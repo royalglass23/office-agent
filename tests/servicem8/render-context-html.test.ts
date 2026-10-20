@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   renderConversationDraftPrompt,
   renderConversationAssistant,
+  renderCompanyCheckMenu,
   renderJobContext,
   renderJobMatches,
   renderJobAdvice,
@@ -13,6 +14,18 @@ import {
 } from "@/lib/servicem8/render-context-html";
 
 describe("renderMenuAssistant", () => {
+  it("keeps Company Check in its own Add-on menu and posts the signed launch token", () => {
+    const url = new URL("https://office.example.test/assistant");
+    const assistant = renderConversationAssistant("May", url, "signed-session-token");
+    const company = renderCompanyCheckMenu(url, "signed-company-token");
+    expect(assistant).not.toContain("Check a construction company");
+    expect(company).toContain('action="https://office.example.test/company-check/launch"');
+    expect(company).toContain('data-navigation="true"');
+    expect(company).toContain('target="_blank" rel="noopener"');
+    expect(company).toContain('name="session" value="signed-company-token"');
+    expect(company).toContain("<title>RG Company Check</title>");
+  });
+
   it("shows every approved Job in the staging audit form only", () => {
     const staging = renderConversationAssistant("May", new URL("https://office-agent-staging.vercel.app/assistant"), "signed-session-token", "greeting-token");
     const production = renderConversationAssistant("May", new URL("https://office-agent-ashy.vercel.app/assistant"), "signed-session-token", "greeting-token");

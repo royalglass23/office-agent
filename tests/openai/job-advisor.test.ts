@@ -6,9 +6,7 @@ const evidence = [
   { id: "note:1", at: "2026-10-14T00:00:00.000Z", text: "Site measure postponed." },
 ];
 const advice = {
-  nextAction: "Confirm the current site measure position.",
   recipient: "internal",
-  question: "Could you please confirm the current site measure position?",
   evidenceId: "note:1",
   evidenceQuote: "Site measure postponed.",
 };
@@ -26,6 +24,9 @@ describe("OpenAI Job advisor", () => {
       text: { format: { type: "json_schema", strict: true, name: "job_next_step" } } });
     expect(body.text.format.schema.properties.evidenceId.enum).toEqual(["note:1"]);
     expect(body.text.format.schema.properties.recipient.enum).toEqual(["customer", "builder", "supplier", "internal"]);
+    expect(body.text.format.schema.required).toEqual(["recipient", "evidenceId", "evidenceQuote"]);
+    expect(body.text.format.schema.properties).not.toHaveProperty("nextAction");
+    expect(body.text.format.schema.properties).not.toHaveProperty("question");
     expect(JSON.parse(body.input)).toMatchObject({ staffRequest: "What should we do next?", evidence });
   });
 

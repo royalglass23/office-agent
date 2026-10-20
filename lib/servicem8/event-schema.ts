@@ -50,7 +50,15 @@ export const serviceM8MenuEventSchema = z
   })
   .strict();
 
-export const serviceM8EventSchema = z.union([serviceM8JobEventSchema, serviceM8MenuEventSchema]);
+export const serviceM8CompanyCheckEventSchema = z
+  .object({
+    ...eventClaimsSchema,
+    eventName: z.string().transform((value) => value.toLowerCase()).pipe(z.literal("rg_company_check_menu")),
+    eventArgs: menuEventArgsSchema,
+  })
+  .strict();
+
+export const serviceM8EventSchema = z.union([serviceM8JobEventSchema, serviceM8MenuEventSchema, serviceM8CompanyCheckEventSchema]);
 
 export type ServiceM8JobEvent = z.infer<typeof serviceM8JobEventSchema>;
 export type ServiceM8MenuEvent = z.infer<typeof serviceM8MenuEventSchema>;

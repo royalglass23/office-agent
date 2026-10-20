@@ -295,8 +295,26 @@ export async function POST(request: Request) {
         result = await proof.adviseJob(requestedJobNumber, form.message ??
           (adviceAction === "email" ? "Draft a useful follow-up email" : "What should we do next?"), adviceAction === "email");
       } catch (error) {
-        if (!(error instanceof ProofGoalClarificationError)) throw error;
-        return html(renderProofMessage("More context needed", error.message, actionUrl, nextSession));
+        if (error instanceof ProofGoalClarificationError) {
+          return html(renderProofMessage("More context needed", error.message, actionUrl, nextSession, requestedJobNumber));
+        }
+        if (error instanceof OpenAIJobAdviceError || error instanceof ProofJobAdviceError) {
+          safeLog("warn", "Job advice failed", {
+            requestId,
+            source: error instanceof OpenAIJobAdviceError ? "provider" : "evidence",
+            ...(error instanceof OpenAIJobAdviceError ? { status: error.status, reason: error.message } : {}),
+          });
+          return html(renderProofMessage(
+            "Unable to recommend a next step",
+            error instanceof OpenAIJobAdviceError
+              ? "The AI recommendation is unavailable right now. Try again or review this Job in ServiceM8. Nothing was sent."
+              : "The suggestion could not be verified against the checked Job notes. Try again or review this Job in ServiceM8. Nothing was sent.",
+            actionUrl,
+            nextSession,
+            requestedJobNumber,
+          ), 502);
+        }
+        throw error;
       }
       safeLog("info", "Completed selected Job advice", logContext);
       return html(renderJobAdvice(result, actionUrl, nextSession));

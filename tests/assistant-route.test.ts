@@ -459,6 +459,29 @@ describe("assistant proof route", () => {
     expect(body).not.toContain("Review-only email draft");
   });
 
+  it("keeps the conversation usable when Job advice is rejected", async () => {
+    const { ProofJobAdviceError } = await import("@/lib/servicem8/office-assistant-proof");
+    proof.adviseJob.mockRejectedValueOnce(new ProofJobAdviceError());
+    const response = await POST(request({ session: "valid-session", message: "What next for R260766?" }));
+    expect(response.status).toBe(502);
+    const body = await response.text();
+    expect(body).toContain("Unable to recommend a next step");
+    expect(body).toContain("could not be verified against the checked Job notes");
+    expect(body).toContain('name="message"');
+    expect(body).toContain('name="contextJobNumber" value="R260766"');
+    expect(body).toContain('name="session" value="next-session-token"');
+  });
+
+  it("distinguishes a provider failure and still offers a usable conversation", async () => {
+    const { OpenAIJobAdviceError } = await import("@/lib/openai/job-advisor");
+    proof.adviseJob.mockRejectedValueOnce(new OpenAIJobAdviceError("request rejected", 502));
+    const response = await POST(request({ session: "valid-session", message: "What next for R260766?" }));
+    expect(response.status).toBe(502);
+    const body = await response.text();
+    expect(body).toContain("AI recommendation is unavailable right now");
+    expect(body).toContain('name="contextJobNumber" value="R260766"');
+  });
+
   it("keeps the selected Job for a conversational follow-up without guessing a new Job", async () => {
     proof.adviseJob.mockResolvedValueOnce({
       job: { jobNumber: "R260766", address: "10 Queen Street", customerName: "Example" },

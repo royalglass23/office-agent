@@ -24,3 +24,11 @@ export async function consumeOAuthState(state: string, now = new Date()) {
   );
   return result.rowCount === 1;
 }
+
+export function saveCompanyCheckOAuthState(state: string, expiresAt: Date) {
+  return saveOAuthState(`company-check\0${state}`, expiresAt);
+}
+
+export function consumeCompanyCheckOAuthState(state: string, now = new Date()) {
+  return consumeOAuthState(`company-check\0${state}`, now);
+}

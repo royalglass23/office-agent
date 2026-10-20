@@ -31,10 +31,23 @@ export function buildAuthorizeUrl(state: string) {
   return url;
 }
 
+export function buildCompanyCheckAuthorizeUrl(state: string) {
+  const config = getConfig();
+  if (!config.companyCheck.enabled) throw new OAuthExchangeError("Company Check is disabled");
+  const url = new URL(AUTHORIZE_URL);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", config.companyCheck.appId);
+  url.searchParams.set("scope", "vendor");
+  url.searchParams.set("redirect_uri", new URL("/api/company-check/oauth/callback", config.appBaseUrl).toString());
+  url.searchParams.set("state", state);
+  return url;
+}
+
 async function requestTokens(
   body: URLSearchParams,
   fetcher: typeof fetch,
   now: Date,
+  expectedScope = getConfig().oauthScopes,
 ): Promise<OAuthTokenSet> {
   const response = await fetcher(TOKEN_URL, {
     method: "POST",
@@ -47,7 +60,7 @@ async function requestTokens(
   const parsed = tokenResponseSchema.safeParse(await response.json());
   if (!parsed.success) throw new OAuthExchangeError("ServiceM8 returned an invalid OAuth token response");
 
-  const requiredScopes = new Set(getConfig().oauthScopes.split(" "));
+  const requiredScopes = new Set(expectedScope.split(" "));
   const grantedScopes = new Set(parsed.data.scope.split(/\s+/));
   if (
     grantedScopes.size !== requiredScopes.size ||
@@ -75,6 +88,23 @@ export async function exchangeAuthorizationCode(code: string, fetcher: typeof fe
     }),
     fetcher,
     now,
+  );
+}
+
+export async function exchangeCompanyCheckAuthorizationCode(code: string, fetcher: typeof fetch = fetch, now = new Date()) {
+  const config = getConfig();
+  if (!config.companyCheck.enabled) throw new OAuthExchangeError("Company Check is disabled");
+  return requestTokens(
+    new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: config.companyCheck.appId,
+      client_secret: config.companyCheck.appSecret,
+      code,
+      redirect_uri: new URL("/api/company-check/oauth/callback", config.appBaseUrl).toString(),
+    }),
+    fetcher,
+    now,
+    "vendor",
   );
 }
 

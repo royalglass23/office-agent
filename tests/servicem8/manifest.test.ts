@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import manifest from "@/manifest.json";
 import stagingManifest from "@/manifest-staging.json";
+import companyManifest from "@/manifest-company-check.json";
 import { GET } from "@/app/api/servicem8/manifest/route";
+import { GET as getCompanyManifest } from "@/app/api/company-check/manifest/route";
 import { resetConfigForTests } from "@/lib/config";
 
 const originalEnv = { ...process.env };
@@ -56,5 +58,13 @@ describe("ServiceM8 add-on manifest", () => {
       actions: [],
       menuItems: [{ name: "RG Office Assistant Staging", event: "rg_office_assistant_menu" }],
     });
+  });
+
+  it("publishes Company Check as a separate Add-on with its own event and vendor-only activation scope", async () => {
+    const served = await getCompanyManifest().json();
+    expect(served).toEqual(companyManifest);
+    expect(companyManifest.menuItems[0].event).toBe("rg_company_check_menu");
+    expect(companyManifest.oauth.scope).toBe("vendor");
+    expect(manifest.menuItems).not.toContainEqual(expect.objectContaining({ event: "rg_company_check_menu" }));
   });
 });

@@ -103,7 +103,7 @@ export async function verifyServiceM8Event(
     const event = parsedEvent.data;
     let freshness: VerifiedServiceM8Event["freshness"] = "unavailable";
 
-    if (event.eventName === "rg_office_assistant_menu") {
+    if (event.eventName === "rg_office_assistant_menu" || event.eventName === "rg_company_check_menu") {
       if (event.iat !== undefined && event.jti !== undefined) {
         if (event.iat > nowSeconds + CLOCK_SKEW_SECONDS) throw new EventVerificationError("Event issued in the future");
         if (nowSeconds - event.iat > MAX_EVENT_AGE_SECONDS) throw new EventVerificationError("Event is too old");
@@ -126,7 +126,9 @@ export async function verifyServiceM8Event(
 
     const replayIdentity = event.eventName === "rg_office_assistant_menu" && event.jti !== undefined
       ? `servicem8-menu\0${event.auth.accountUUID}\0${event.jti}`
-      : token;
+      : event.eventName === "rg_company_check_menu" && event.jti !== undefined
+        ? `servicem8-company-check-menu\0${event.auth.accountUUID}\0${event.jti}`
+        : token;
 
     return {
       event,

@@ -16,13 +16,13 @@ function escapeHtml(value: string) {
   });
 }
 
-function document(body: string, styles = "", script = "", formAction = "'none'") {
+function document(body: string, styles = "", script = "", formAction = "'none'", title = "RG Office Assistant") {
   const nonce = randomBytes(18).toString("base64");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src ${formAction}; base-uri 'none'; form-action ${formAction}">
 <meta name="referrer" content="no-referrer">
-<title>RG Office Assistant</title><style>body{font:15px system-ui,sans-serif;margin:24px;color:#182230}h1{font-size:20px}dt{font-weight:650;margin-top:12px}dd{margin:3px 0 0;overflow-wrap:anywhere}.notice{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}.error{background:#fff0f0;border-color:#b42318}${styles}</style></head>
+<title>${escapeHtml(title)}</title><style>body{font:15px system-ui,sans-serif;margin:24px;color:#182230}h1{font-size:20px}dt{font-weight:650;margin-top:12px}dd{margin:3px 0 0;overflow-wrap:anywhere}.notice{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}.error{background:#fff0f0;border-color:#b42318}${styles}</style></head>
 <body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ""}</body></html>`;
 }
 
@@ -48,7 +48,7 @@ export function renderMenuAssistant(staffFirstName: string) {
 
 const proofStyles = `.assistant-shell{max-width:780px;margin:0 auto}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#53657d;margin:0 0 6px}.search{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.search-row{display:flex;gap:10px;align-items:end}label{display:block;font-weight:650;margin-bottom:7px}.field{flex:1}input[type=text],textarea,select{box-sizing:border-box;width:100%;border:1px solid #9baaba;border-radius:8px;padding:11px;font:inherit}textarea{resize:vertical}button{border:0;border-radius:8px;padding:11px 18px;background:#175cd3;color:#fff;font:inherit;font-weight:650;cursor:pointer}button:disabled{cursor:wait;opacity:.7}.match{display:block;width:100%;margin:10px 0;padding:14px;text-align:left;background:#fff;color:#182230;border:1px solid #b8c2ce}.match strong,.match span{display:block}.summary{font-size:17px;line-height:1.55}.timeline{padding-left:22px}.timeline li{margin:0 0 16px}.sources,.coverage,.privacy{font-size:13px;color:#53657d}.coverage{padding:12px;background:#fff5d8;border-left:4px solid #b7791f}.draft-card{padding:18px;background:#f4f7fa;border:1px solid #d8e0e8;border-radius:12px}.draft-body{white-space:pre-wrap;font:inherit;line-height:1.55;margin:0}@media(max-width:560px){.search-row{align-items:stretch;flex-direction:column}}`;
 
-const proofSubmitOnceScript = `document.addEventListener("submit",async function(event){const form=event.target;if(!(form instanceof HTMLFormElement)||form.method.toLowerCase()!=="post"||form.dataset.audit==="true")return;event.preventDefault();if(form.dataset.submitted==="true")return;form.dataset.submitted="true";form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=true;button.textContent=button.dataset.pendingLabel||"Checking…";});try{const response=await fetch(form.action,{method:"POST",body:new URLSearchParams(new FormData(form)),headers:{"Content-Type":"application/x-www-form-urlencoded"},credentials:"omit",cache:"no-store",redirect:"error"});const page=await response.text();const next=new DOMParser().parseFromString(page,"text/html");document.documentElement.innerHTML=next.documentElement.innerHTML;}catch{form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=false;button.textContent="Try again";});form.dataset.submitted="false";let notice=form.querySelector('.submit-error');if(!notice){notice=document.createElement('p');notice.className='notice error submit-error';form.appendChild(notice);}notice.textContent='The request could not be completed. Check your connection and try again.';}});`;
+const proofSubmitOnceScript = `document.addEventListener("submit",async function(event){const form=event.target;if(!(form instanceof HTMLFormElement)||form.method.toLowerCase()!=="post"||(form.dataset.audit==="true"||form.dataset.navigation==="true"))return;event.preventDefault();if(form.dataset.submitted==="true")return;form.dataset.submitted="true";form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=true;button.textContent=button.dataset.pendingLabel||"Checking…";});try{const response=await fetch(form.action,{method:"POST",body:new URLSearchParams(new FormData(form)),headers:{"Content-Type":"application/x-www-form-urlencoded"},credentials:"omit",cache:"no-store",redirect:"error"});const page=await response.text();const next=new DOMParser().parseFromString(page,"text/html");document.documentElement.innerHTML=next.documentElement.innerHTML;}catch{form.querySelectorAll('button[type="submit"]').forEach(function(button){button.disabled=false;button.textContent="Try again";});form.dataset.submitted="false";let notice=form.querySelector('.submit-error');if(!notice){notice=document.createElement('p');notice.className='notice error submit-error';form.appendChild(notice);}notice.textContent='The request could not be completed. Check your connection and try again.';}});`;
 
 function hiddenSession(sessionToken: string) {
   return `<input type="hidden" name="session" value="${escapeHtml(sessionToken)}">`;
@@ -84,10 +84,13 @@ export function renderProofMessage(
   message: string,
   actionUrl?: URL,
   sessionToken?: string,
+  selectedJobNumber?: string,
 ) {
   const retry = actionUrl && sessionToken ? `<h2>Try another Job</h2>${searchForm(actionUrl, sessionToken)}` : "";
+  const continueConversation = actionUrl && sessionToken && selectedJobNumber
+    ? `<h2>Continue with ${escapeHtml(selectedJobNumber)}</h2>${conversationForm(actionUrl, sessionToken, selectedJobNumber)}` : "";
   const formOrigin = actionUrl?.origin ?? "'none'";
-  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>${escapeHtml(title)}</h1><p class="notice error">${escapeHtml(message)}</p>${retry}</main>`, proofStyles, proofSubmitOnceScript, formOrigin);
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Office Assistant</p><h1>${escapeHtml(title)}</h1><p class="notice error">${escapeHtml(message)}</p>${continueConversation}${retry}</main>`, selectedJobNumber ? conversationStyles : proofStyles, proofSubmitOnceScript, formOrigin);
 }
 
 type RenderableProofAnswer = {
@@ -131,6 +134,15 @@ const conversationStyles = `${proofStyles}.conversation{padding:18px;margin:20px
 function conversationForm(actionUrl: URL, sessionToken: string, selectedJobNumber?: string) {
   const context = selectedJobNumber ? `<input type="hidden" name="contextJobNumber" value="${escapeHtml(selectedJobNumber)}">` : "";
   return `<form class="chat-form" method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}${context}<label for="message">Message</label><div class="composer"><textarea id="message" name="message" rows="2" maxlength="500" required placeholder="${selectedJobNumber ? "e.g. What should we do next?" : "e.g. What happened to R260766?"}"></textarea><button type="submit" data-pending-label="Checking…">Send</button></div><p class="privacy">Read-only. Nothing is sent or saved to ServiceM8.</p></form><form method="post" action="${escapeHtml(actionUrl.toString())}">${hiddenSession(sessionToken)}<input type="hidden" name="restart" value="1"><button type="submit">Start new conversation</button></form>`;
+}
+
+function companyCheckLaunchForm(actionUrl: URL, sessionToken: string) {
+  const companyUrl = new URL("/company-check/launch", actionUrl);
+  return `<form data-navigation="true" method="post" action="${escapeHtml(companyUrl.toString())}" target="_blank" rel="noopener">${hiddenSession(sessionToken)}<button type="submit">Check a construction company</button><p class="privacy">Opens a staff-only Company Check tab.</p></form>`;
+}
+
+export function renderCompanyCheckMenu(actionUrl: URL, sessionToken: string) {
+  return document(`<main class="assistant-shell"><p class="eyebrow">RG Company Check</p><h1>Company checks</h1><p>Research a construction company by name or website and save a dated report.</p>${companyCheckLaunchForm(actionUrl, sessionToken)}</main>`, proofStyles, "", actionUrl.origin, "RG Company Check");
 }
 
 function stagingAuditForm(actionUrl: URL, sessionToken: string) {

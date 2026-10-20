@@ -69,9 +69,7 @@ export type ProofEmailDrafter = {
 export type EmailCandidate = { id: string; subjectReason: string; question: string };
 export type EmailFact = { id: string; text: string; citations: string[] };
 export type JobAdviceSelection = {
-  nextAction: string;
   recipient: EmailRecipient;
-  question: string;
   evidenceId: string;
   evidenceQuote: string;
 };
@@ -487,23 +485,18 @@ export function createOfficeAssistantProof({ reader, summarizer, drafter, adviso
         throw new ProofGoalClarificationError("No Job notes were available for a next-step recommendation. Check the Job Diary in ServiceM8 before acting.");
       }
       const advice = await advisor.advise(evidence, request);
-      if (!advice || Object.keys(advice).sort().join(",") !== "evidenceId,evidenceQuote,nextAction,question,recipient" ||
+      if (!advice || Object.keys(advice).sort().join(",") !== "evidenceId,evidenceQuote,recipient" ||
           !emailRecipients.includes(advice.recipient)) throw new ProofJobAdviceError();
       const source = notes.find((item) => item.id === advice.evidenceId);
-      const modelAction = advice.nextAction.trim();
-      const modelQuestion = advice.question.trim();
       const quote = advice.evidenceQuote.trim();
       const addressedContact = request.match(/\b(?:to|for)\s+(?:(?:the|our|a)\s+)?(office team|customer|client|builder|supplier|team|office|internal)\b/i)?.[1]?.toLowerCase();
       const requestedContact = addressedContact === "client" ? "customer"
         : addressedContact === "team" || addressedContact === "office" || addressedContact === "office team" ? "internal"
         : addressedContact as EmailRecipient | undefined;
       const recipient = requestedContact ?? advice.recipient;
-      if (!source || quote.length < 8 || quote.length > 300 || !source.text.includes(quote) ||
-          modelAction.length < 8 || modelAction.length > 300 || /[\r\n]/.test(modelAction) || normalizeText(modelAction) !== modelAction ||
-          modelQuestion.length < 8 || modelQuestion.length > 350 || /[\r\n]/.test(modelQuestion) ||
-          normalizeText(modelQuestion) !== modelQuestion) throw new ProofJobAdviceError();
-      // The model chooses a relevant note and contact. Its prose is not used as a
-      // factual claim or customer question: an exact quote alone cannot verify it.
+      if (!source || quote.length < 8 || quote.length > 300 || !source.text.includes(quote)) throw new ProofJobAdviceError();
+      // The model selects evidence and a contact only. A matching quote cannot
+      // verify model-authored action prose or a customer-facing question.
       const topic = /\b(?:site\s+)?measure(?:ment|ments|d)?\b/i.test(quote) ? "site measure"
         : /\b(?:quote|quotation|estimate)\b/i.test(quote) ? "quote"
         : /\b(?:booking|appointment|schedule|scheduled)\b/i.test(quote) ? "booking"

@@ -59,19 +59,38 @@ whole ServiceM8 history.
 _Avoid_: Complete Job history, full diary
 
 **Extended Job History**:
-Additional ServiceM8 evidence such as email, SMS, forms, attachments, and schedule activity. These
-sources are deferred from the first release but remain necessary before the Office Assistant can
-claim a complete operational history.
+The read-only account of a Selected Job assembled from its available communication, diary, document,
+photo, quote and schedule records. It includes the contents of readable files and photos where
+possible, and names records whose contents could not be read.
 _Avoid_: Optional context, already covered
+
+**Source Coverage**:
+The explicit account of which record types and contents were read for an Extended Job History and
+which were unavailable, incomplete or unreadable. It qualifies any claim about the Job's history.
+_Avoid_: Complete by default, empty means none
 
 **Suggested Next Action**:
 A clearly labelled recommendation based on Observed Job Facts; it is not a ServiceM8 status change,
 task, assignment, or approval. This capability is deferred until the initial read-only proof works.
 _Avoid_: Next step, automated action
 
+**Attention Flag**:
+A review prompt for a Job produced by an agreed rule over checked records, with the triggering
+evidence shown to staff. AI may explain the flag but does not decide whether it exists.
+_Avoid_: AI urgency score, automatic task
+
 **Email Draft**:
-Proposed email subject and body constructed by server code for a deliberately Selected Job and a
-staff-supplied purpose, using evidence IDs selected by the Approved Proof Provider from the same
-Initial Job Context as the Proof Answer. It is shown for review and copying and is never sent or
-saved to ServiceM8 by the Office Assistant.
+A proposed subject and body for a named recipient and staff-stated outcome, supported by a Selected
+Job or Inbox message and shown for staff review. The recipient may be a customer, builder, supplier
+or internal staff member; staff copy and send it themselves.
 _Avoid_: Email, outbound message
+
+**Opportunity Report**:
+A reviewable report started from a public project page or company website that combines sourced
+construction-company facts, relevant project/site context and clearly labelled Royal Glass collaboration hypotheses. It does not profile individual people.
+_Avoid_: Verified lead, partnership offer
+
+**Report Version**:
+A dated, saved snapshot of an Opportunity Report. Rerunning a URL creates another version so staff
+can compare findings without treating old public-source facts as current.
+_Avoid_: Live company profile, overwritten report

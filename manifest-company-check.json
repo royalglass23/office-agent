@@ -1,0 +1,15 @@
+{
+  "$schema": "https://api.servicem8.com/api_1.0/addonsdk/manifest-schema/v1.json",
+  "name": "RG Company Check",
+  "version": "0.1.0",
+  "oauth": { "scope": "vendor" },
+  "actions": [],
+  "menuItems": [
+    {
+      "name": "RG Company Check",
+      "type": "addon",
+      "iconURL": "https://office-agent-ashy.vercel.app/company-check-icon.png",
+      "event": "rg_company_check_menu"
+    }
+  ]
+}

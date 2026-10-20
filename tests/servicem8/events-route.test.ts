@@ -111,6 +111,18 @@ describe("ServiceM8 event route", () => {
     expect(clientConstructor).not.toHaveBeenCalled();
   });
 
+  it("does not launch Company Check through the Office Assistant callback", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, eventName: "rg_company_check_menu", iat: now - 1,
+        exp: now + 120, jti: "separate-addon-event" }),
+    }));
+    expect(response.status).toBe(400);
+    expect(consumeEventHash).not.toHaveBeenCalled();
+    expect(issueAssistantSession).not.toHaveBeenCalled();
+  });
+
   it("rejects a signed foreign account before replay storage, API access, or session issuance", async () => {
     getConfig.mockReturnValueOnce({
       appBaseUrl: new URL("https://office.example.test"),

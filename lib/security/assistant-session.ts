@@ -6,6 +6,8 @@ import { uuidSchema } from "@/lib/servicem8/event-schema";
 const ISSUER = "rg-office-agent";
 const AUDIENCE = "rg-office-assistant-proof";
 const GREETING_AUDIENCE = "rg-office-assistant-greeting";
+const COMPANY_CHECK_AUDIENCE = "rg-company-check";
+const COMPANY_CHECK_LAUNCH_AUDIENCE = "rg-company-check-launch";
 const SESSION_SECONDS = 30 * 60;
 const GREETING_SESSION_SECONDS = 2 * 60;
 const CLOCK_TOLERANCE_SECONDS = 30;
@@ -23,6 +25,8 @@ const assistantRateLimits = {
   search: { maximum: 10, windowSeconds: 60 },
   summary: { maximum: 5, windowSeconds: 60 },
   draft: { maximum: 5, windowSeconds: 60 },
+  companySearch: { maximum: 10, windowSeconds: 60 },
+  companyResearch: { maximum: 3, windowSeconds: 60 },
 } as const;
 
 export function assistantSessionHash(token: string) {
@@ -35,7 +39,7 @@ export function assistantGreetingSessionHash(token: string) {
 
 export function assistantRateLimit(
   identity: AssistantIdentity,
-  action: "request" | "search" | "summary" | "draft",
+  action: keyof typeof assistantRateLimits,
   now = new Date(),
 ) {
   const { maximum, windowSeconds } = assistantRateLimits[action];
@@ -143,5 +147,57 @@ export async function verifyAssistantGreetingSession(
     });
   } catch {
     throw new Error("Assistant greeting session is invalid");
+  }
+}
+
+export async function issueCompanyCheckSession(identity: AssistantIdentity, secret: string, now = new Date()) {
+  const parsed = identitySchema.parse({ accountUUID: identity.accountUUID, staffUUID: identity.staffUUID });
+  const issuedAt = Math.floor(now.getTime() / 1000);
+  return new SignJWT(parsed)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer(ISSUER)
+    .setAudience(COMPANY_CHECK_AUDIENCE)
+    .setJti(randomUUID())
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + SESSION_SECONDS)
+    .sign(signingKey(secret));
+}
+
+export async function issueCompanyCheckLaunchSession(identity: AssistantIdentity, secret: string, now = new Date()) {
+  const parsed = identitySchema.parse({ accountUUID: identity.accountUUID, staffUUID: identity.staffUUID });
+  const issuedAt = Math.floor(now.getTime() / 1000);
+  return new SignJWT(parsed)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer(ISSUER)
+    .setAudience(COMPANY_CHECK_LAUNCH_AUDIENCE)
+    .setJti(randomUUID())
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + 5 * 60)
+    .sign(signingKey(secret));
+}
+
+export async function verifyCompanyCheckLaunchSession(token: string, secret: string, now = new Date()): Promise<AssistantIdentity> {
+  try {
+    if (!token || token.length > 4_096 || token.split(".").length !== 3) throw new Error("invalid");
+    const verified = await jwtVerify(token, signingKey(secret), {
+      algorithms: ["HS256"], issuer: ISSUER, audience: COMPANY_CHECK_LAUNCH_AUDIENCE,
+      clockTolerance: CLOCK_TOLERANCE_SECONDS, currentDate: now,
+    });
+    return identitySchema.parse({ accountUUID: verified.payload.accountUUID, staffUUID: verified.payload.staffUUID });
+  } catch {
+    throw new Error("Company check launch session is invalid");
+  }
+}
+
+export async function verifyCompanyCheckSession(token: string, secret: string, now = new Date()): Promise<AssistantIdentity> {
+  try {
+    if (!token || token.length > 4_096 || token.split(".").length !== 3) throw new Error("invalid");
+    const verified = await jwtVerify(token, signingKey(secret), {
+      algorithms: ["HS256"], issuer: ISSUER, audience: COMPANY_CHECK_AUDIENCE,
+      clockTolerance: CLOCK_TOLERANCE_SECONDS, currentDate: now,
+    });
+    return identitySchema.parse({ accountUUID: verified.payload.accountUUID, staffUUID: verified.payload.staffUUID });
+  } catch {
+    throw new Error("Company check session is invalid");
   }
 }

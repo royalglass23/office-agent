@@ -26,8 +26,8 @@ npm run lint
 npm run build
 ```
 
-Copy `.env.example` to `.env.local` and provide a dedicated Phase 0 database and ServiceM8 public
-application credentials. Apply the security-state schema before starting the application:
+Copy `.env.example` to `.env.local` and provide a dedicated database and ServiceM8 public
+application credentials. Review the migration target before applying the schemas:
 
 ```powershell
 npm run db:migrate
@@ -41,3 +41,44 @@ upload the updated ServiceM8 manifest, or constitute live evidence.
 
 Follow [the Phase 0 runbook](docs/phase-0-runbook.md) and record redacted Michael/Carla evidence
 before treating the production proof as successful.
+
+## Company checks
+
+Company Check is a **separately registered ServiceM8 web-service Add-on**. It has its own
+[`manifest-company-check.json`](manifest-company-check.json), callback at
+`/api/company-check/events`, menu event `rg_company_check_menu`, and App ID/Secret. Its activation
+uses a separate OAuth flow with only the `vendor` scope to confirm the authorised ServiceM8
+account. The callback discards that Add-on's access and refresh tokens after verification; it
+never writes to the Office Assistant connection. The existing RG Office Assistant manifest and
+menu do not launch Company Check.
+
+The separate Add-on opens the hosted report in a new browser tab. The top-level tab lets the
+short-lived, HTTP-only staff cookie work without depending on third-party iframe cookies.
+The Add-on remains independent of the Job Diary gate. Staff search a construction company by name, select an
+official Companies Register result when needed, and review a sourced report with NZBN, directors,
+company-published decision contacts, public projects, photo source links, and exact-address
+Homes.co.nz checks. Reports and property results are account-scoped PostgreSQL snapshots; a new
+run creates a dated version, and staff can compare and print a saved report.
+
+The feature is disabled by default. The deployment needs migration
+[`0002_company_check.sql`](db/migrations/0002_company_check.sql), reviewed OpenAI data controls,
+`COMPANY_CHECK_ENABLED=true`, the new Add-on's `CC_APP_ID` and `CC_APP_SECRET`, an approved
+`NZBN_API_KEY`, `OPENAI_API_KEY`, and `OPENAI_RESEARCH_MODEL`.
+Create a separate ServiceM8 web-service Add-on registration with manifest URL
+`https://<APP_BASE_URL host>/api/company-check/manifest` and web-service callback URL
+`https://<APP_BASE_URL host>/api/company-check/events`. Set its Activation URL to
+`https://<APP_BASE_URL host>/api/company-check/oauth/start` and its OAuth return URL to
+`https://<APP_BASE_URL host>/api/company-check/oauth/callback`. Store its App Secret only in the host's
+secret configuration. Do not reuse the RG Office Assistant App Secret. The separate registration
+must be activated for the authorised ServiceM8 account before a live staff launch can be tested.
+NZBN search and exact entity verification use the official NZBN API; obtain a subscription key
+and validate against its sandbox before enabling the production flag. The Homes lookup uses
+a PostgreSQL account-wide 12.5-second slot and a 30-day cache, separate from the ServiceM8
+Check Address add-on. The automatic check runs only for a full address confirmed on the linked
+company project page; an uncertain match never receives property facts.
+
+The report links to source photos without embedding them in Office Agent until display rights are
+confirmed. Director names from the register are company facts; a listed director is not
+automatically the person authorised to decide on a project. The report is a staff research aid,
+not a due-diligence clearance. The 12-month date marks review due; deletion remains an owner/admin
+process to define before applying any retention action.

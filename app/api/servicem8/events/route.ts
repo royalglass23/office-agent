@@ -33,6 +33,9 @@ export async function POST(request: Request) {
   try {
     const config = getConfig();
     const verified = await verifyServiceM8Event(await request.text(), config.serviceM8AppSecret);
+    if (verified.event.eventName === "rg_company_check_menu") {
+      return addonResponse(renderError("Launch rejected", "This event belongs to the separate Company Check Add-on."), 400);
+    }
     if (verified.event.auth.accountUUID !== config.allowedAccountUUID) {
       safeLog("warn", "Rejected unapproved ServiceM8 account", {
         requestId,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetConfigForTests } from "@/lib/config";
-import { buildAuthorizeUrl, exchangeAuthorizationCode, exchangeRefreshToken, OAuthExchangeError } from "@/lib/servicem8/oauth";
+import { buildAuthorizeUrl, buildCompanyCheckAuthorizeUrl, exchangeAuthorizationCode,
+  exchangeCompanyCheckAuthorizationCode, exchangeRefreshToken, OAuthExchangeError } from "@/lib/servicem8/oauth";
 
 const originalEnv = { ...process.env };
 
@@ -28,6 +29,17 @@ function tokenResponse(scope = "vendor read_jobs read_customers read_job_notes r
     token_type: "bearer",
     scope,
   }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
+function enableCompanyCheck() {
+  process.env.COMPANY_CHECK_ENABLED = "true";
+  process.env.CC_APP_ID = "separate-company-app-id";
+  process.env.CC_APP_SECRET = "separate-company-secret-long-enough";
+  process.env.NZBN_API_KEY = "nzbn-test-key";
+  process.env.OPENAI_API_KEY = "openai-test-key";
+  process.env.OPENAI_RESEARCH_MODEL = "research-test";
+  process.env.OPENAI_DATA_CONTROLS_VERIFIED = "true";
+  resetConfigForTests();
 }
 
 describe("ServiceM8 OAuth", () => {
@@ -72,5 +84,22 @@ describe("ServiceM8 OAuth", () => {
     const tokens = await exchangeRefreshToken("old-refresh", fetcher);
     expect(tokens.refreshToken).toBe("rotated-refresh");
     expect(String(((fetcher as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit).body)).toContain("refresh_token=old-refresh");
+  });
+
+  it("uses separate Company Check credentials and only the vendor activation scope", async () => {
+    enableCompanyCheck();
+    const url = buildCompanyCheckAuthorizeUrl("company-state");
+    expect(url.searchParams.get("client_id")).toBe("separate-company-app-id");
+    expect(url.searchParams.get("scope")).toBe("vendor");
+    expect(url.searchParams.get("redirect_uri")).toBe("https://office.example.test/api/company-check/oauth/callback");
+
+    const fetcher = vi.fn(async () => tokenResponse("vendor")) as unknown as typeof fetch;
+    await exchangeCompanyCheckAuthorizationCode("temporary-code", fetcher);
+    const params = new URLSearchParams(String((fetcher as ReturnType<typeof vi.fn>).mock.calls[0][1].body));
+    expect(params.get("client_id")).toBe("separate-company-app-id");
+    expect(params.get("client_secret")).toBe("separate-company-secret-long-enough");
+    expect(params.get("redirect_uri")).toBe("https://office.example.test/api/company-check/oauth/callback");
+    const wrongScope = vi.fn(async () => tokenResponse("vendor read_jobs")) as unknown as typeof fetch;
+    await expect(exchangeCompanyCheckAuthorizationCode("temporary-code", wrongScope)).rejects.toBeInstanceOf(OAuthExchangeError);
   });
 });

@@ -14,8 +14,13 @@ const envSchema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   SESSION_SIGNING_SECRET: z.string().min(32),
   ASSISTANT_PROOF_ENABLED: z.enum(["true", "false"]).optional().default("false"),
+  COMPANY_CHECK_ENABLED: z.enum(["true", "false"]).optional().default("false"),
+  CC_APP_ID: z.string().min(1).optional(),
+  CC_APP_SECRET: z.string().min(16).optional(),
+  NZBN_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).max(200).optional(),
+  OPENAI_RESEARCH_MODEL: z.string().min(1).max(200).optional(),
   OPENAI_DATA_CONTROLS_VERIFIED: z.enum(["true", "false"]).optional().default("false"),
 });
 
@@ -30,6 +35,7 @@ export type PhaseZeroConfig = {
   tokenEncryptionKey: string;
   sessionSigningSecret: string;
   assistantProof: { enabled: false } | { enabled: true; apiKey: string; model: string };
+  companyCheck: { enabled: false } | { enabled: true; apiKey: string; model: string; nzbnApiKey: string; appId: string; appSecret: string };
 };
 
 let cached: PhaseZeroConfig | undefined;
@@ -66,6 +72,22 @@ export function getConfig(): PhaseZeroConfig {
   if (proofEnabled && (!env.OPENAI_API_KEY || !env.OPENAI_MODEL)) {
     throw new Error("OPENAI_API_KEY and OPENAI_MODEL are required when the assistant proof is enabled");
   }
+  const companyCheckEnabled = env.COMPANY_CHECK_ENABLED === "true";
+  if (companyCheckEnabled && env.OPENAI_DATA_CONTROLS_VERIFIED !== "true") {
+    throw new Error("OPENAI_DATA_CONTROLS_VERIFIED must be true before enabling company check");
+  }
+  if (companyCheckEnabled && (!env.OPENAI_API_KEY || !env.OPENAI_RESEARCH_MODEL)) {
+    throw new Error("OPENAI_API_KEY and OPENAI_RESEARCH_MODEL are required when company check is enabled");
+  }
+  if (companyCheckEnabled && !env.NZBN_API_KEY) {
+    throw new Error("NZBN_API_KEY is required when company check is enabled");
+  }
+  if (companyCheckEnabled && !env.CC_APP_ID) {
+    throw new Error("CC_APP_ID is required when company check is enabled");
+  }
+  if (companyCheckEnabled && !env.CC_APP_SECRET) {
+    throw new Error("CC_APP_SECRET is required when company check is enabled");
+  }
 
   cached = {
     appBaseUrl,
@@ -79,6 +101,10 @@ export function getConfig(): PhaseZeroConfig {
     sessionSigningSecret: env.SESSION_SIGNING_SECRET,
     assistantProof: proofEnabled
       ? { enabled: true, apiKey: env.OPENAI_API_KEY!, model: env.OPENAI_MODEL! }
+      : { enabled: false },
+    companyCheck: companyCheckEnabled
+      ? { enabled: true, apiKey: env.OPENAI_API_KEY!, model: env.OPENAI_RESEARCH_MODEL!,
+          nzbnApiKey: env.NZBN_API_KEY!, appId: env.CC_APP_ID!, appSecret: env.CC_APP_SECRET! }
       : { enabled: false },
   };
   return cached;
