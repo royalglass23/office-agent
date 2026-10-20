@@ -3,10 +3,10 @@ import { z } from "zod";
 import { ServiceM8ApiError, type ServiceM8Client } from "./client";
 import { uuidSchema } from "./event-schema";
 
-export const auditJobNumbers = ["R260766", "R260609"] as const;
+export const auditJobNumbers = ["R260766", "R260609", "R260611"] as const;
 export type AuditJobNumber = typeof auditJobNumbers[number];
 
-type Source = "notes" | "email" | "activities" | "attachments";
+type Source = "notes" | "email" | "activities" | "attachments" | "sms" | "payments";
 type AuditPage = { records: unknown[]; nextCursor: string | null };
 type AuditRecord = {
   key: string;
@@ -14,15 +14,17 @@ type AuditRecord = {
   direction?: "inbound" | "outbound" | "unknown";
   contentPresent?: boolean | null;
   fileType?: "pdf" | "image" | "other" | "unknown";
+  attachmentRole?: "quote" | "other" | "unknown";
   endAt?: string | null;
-  active: boolean;
+  lastEditAt?: string | null;
+  active: boolean | null;
 };
 
 const MAX_PAGES = 20;
 const MAX_RECORDS = 2_000;
-const timestamp = z.string().max(40)
-  .regex(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:?\d{2})?$/)
-  .nullable().optional();
+const requiredTimestamp = z.string().max(40)
+  .regex(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:?\d{2})?$/);
+const timestamp = requiredTimestamp.nullable().optional();
 const related = z.object({
   uuid: uuidSchema,
   related_object: z.string().transform((value) => value.toLowerCase()).pipe(z.literal("job")),
@@ -43,9 +45,24 @@ const activitySchema = z.object({
   job_uuid: uuidSchema,
   start_date: timestamp,
   end_date: timestamp,
+  edit_date: timestamp,
   active: z.union([z.literal(0), z.literal(1)]).optional().default(1),
 }).passthrough();
-const attachmentSchema = related.extend({ timestamp, file_type: z.string().optional() });
+const attachmentSchema = related.extend({ timestamp, file_type: z.string().optional(), attachment_source: z.string().optional() });
+const smsSchema = z.object({
+  uuid: uuidSchema,
+  related_object: z.literal("job"),
+  related_object_uuid: uuidSchema,
+  timestamp: requiredTimestamp,
+  direction: z.enum(["inbound", "outbound"]),
+  message: z.string(),
+}).passthrough();
+const paymentSchema = z.object({
+  uuid: uuidSchema,
+  job_uuid: uuidSchema,
+  timestamp: requiredTimestamp,
+  active: z.union([z.literal(0), z.literal(1)]).optional().default(1),
+}).passthrough();
 
 function keyFor(secret: string, source: Source, uuid: string) {
   return createHmac("sha256", secret).update(`RG-380\0${source}\0${uuid}`).digest("hex").slice(0, 24);
@@ -59,11 +76,21 @@ function fileType(value: string | undefined): AuditRecord["fileType"] {
   return "other";
 }
 
+function attachmentRole(value: string | undefined): AuditRecord["attachmentRole"] {
+  if (!value) return "unknown";
+  return value.toUpperCase() === "QUOTE" ? "quote" : "other";
+}
+
 function projectRecord(source: Source, value: unknown, jobUUID: string, secret: string): AuditRecord | null {
   if (source === "activities") {
     const item = activitySchema.parse(value);
     if (item.job_uuid !== jobUUID) throw new Error("Audit child Job mismatch");
-    return { key: keyFor(secret, source, item.uuid), at: item.start_date ?? null, endAt: item.end_date ?? null, active: item.active === 1 };
+    return { key: keyFor(secret, source, item.uuid), at: item.start_date ?? null, endAt: item.end_date ?? null, lastEditAt: item.edit_date ?? null, active: item.active === 1 };
+  }
+  if (source === "payments") {
+    const item = paymentSchema.parse(value);
+    if (item.job_uuid !== jobUUID) throw new Error("Audit child Job mismatch");
+    return { key: keyFor(secret, source, item.uuid), at: item.timestamp ?? null, active: item.active === 1 };
   }
   if (source === "notes") {
     const item = noteSchema.parse(value);
@@ -81,9 +108,17 @@ function projectRecord(source: Source, value: unknown, jobUUID: string, secret: 
         : Boolean(item.message?.length || item.message_text?.length || item.message_html?.length),
     };
   }
+  if (source === "sms") {
+    const item = smsSchema.parse(value);
+    if (item.related_object_uuid !== jobUUID) throw new Error("Audit child Job mismatch");
+    return {
+      key: keyFor(secret, source, item.uuid), at: item.timestamp ?? null,
+      direction: item.direction, contentPresent: item.message.length > 0, active: null,
+    };
+  }
   const item = attachmentSchema.parse(value);
   if (item.related_object_uuid !== jobUUID) throw new Error("Audit child Job mismatch");
-  return { key: keyFor(secret, source, item.uuid), at: item.timestamp ?? null, fileType: fileType(item.file_type), active: item.active === 1 };
+  return { key: keyFor(secret, source, item.uuid), at: item.timestamp ?? null, fileType: fileType(item.file_type), attachmentRole: attachmentRole(item.attachment_source), active: item.active === 1 };
 }
 
 async function collectSource(
@@ -141,6 +176,8 @@ export async function auditJobDiary(client: ServiceM8Client, jobNumber: AuditJob
     ["email", (cursor: string | null) => client.listJobEmailsPage(job.uuid, cursor)],
     ["activities", (cursor: string | null) => client.listJobActivitiesPage(job.uuid, cursor)],
     ["attachments", (cursor: string | null) => client.listJobAttachmentsPage(job.uuid, cursor)],
+    ["sms", (cursor: string | null) => client.listJobSmsPage(job.uuid, cursor)],
+    ["payments", (cursor: string | null) => client.listJobPaymentsPage(job.uuid, cursor)],
   ] as const) {
     sources.push(await collectSource(source, reader, job.uuid, secret));
   }

@@ -120,6 +120,8 @@ describe("ServiceM8Client", () => {
     ["listJobEmailsPage", "email.json", `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`],
     ["listJobActivitiesPage", "jobactivity.json", `job_uuid eq '${jobUUID}'`],
     ["listJobAttachmentsPage", "attachment.json", `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`],
+    ["listJobSmsPage", "sms.json", `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`],
+    ["listJobPaymentsPage", "jobpayment.json", `job_uuid eq '${jobUUID}'`],
   ] as const)("reads %s with exact Job filter and staff impersonation", async (method, resource, filter) => {
     const nextCursor = "123e4567-cb72-4d94-8a1e-d454131257eb";
     const fetcher = vi.fn(async () => Response.json([{ uuid: jobUUID }], {

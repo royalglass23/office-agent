@@ -24,7 +24,7 @@ vi.mock("@/lib/servicem8/client", () => ({
   requireVendorAccount: mocks.requireVendor,
 }));
 vi.mock("@/lib/servicem8/job-diary-audit", () => ({
-  auditJobNumbers: ["R260766", "R260609"],
+  auditJobNumbers: ["R260766", "R260609", "R260611"],
   auditJobDiary: mocks.audit,
 }));
 
@@ -32,7 +32,7 @@ import { POST } from "@/app/assistant/audit/route";
 
 const accountUUID = "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b";
 const staffUUID = "9d914a06-221e-4013-8b4d-2735272710eb";
-const scopes = "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments";
+const scopes = "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments";
 const staging = "https://office-agent-staging.vercel.app";
 
 function request(origin = staging, jobNumber = "R260609", session = "signed-session") {
@@ -64,15 +64,21 @@ describe("staging RG-380 audit route", () => {
     expect(mocks.client).not.toHaveBeenCalled();
   });
 
-  it("rejects Jobs outside the owner's two authorised fixtures", async () => {
+  it("rejects Jobs outside the owner's authorised fixtures", async () => {
     const response = await POST(request(staging, "R260680"));
     expect(response.status).toBe(400);
     expect(mocks.verifySession).not.toHaveBeenCalled();
     expect(mocks.client).not.toHaveBeenCalled();
   });
 
-  it("requires an exact eight-scope stored grant before any ServiceM8 read", async () => {
-    mocks.getConnection.mockResolvedValue({ scopes: "vendor read_jobs read_customers read_job_notes read_staff" });
+  it("accepts the owner's newly authorised R260611 fixture", async () => {
+    const response = await POST(request(staging, "R260611"));
+    expect(response.status).toBe(200);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), "R260611", "test-signing-secret");
+  });
+
+  it("requires an exact ten-scope stored grant before any ServiceM8 read", async () => {
+    mocks.getConnection.mockResolvedValue({ scopes: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments" });
     const response = await POST(request());
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ status: "grant_incomplete" });

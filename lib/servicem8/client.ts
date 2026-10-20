@@ -181,10 +181,10 @@ export class ServiceM8Client {
     return { records, nextCursor };
   }
 
-  private async listAuditPage(resource: "email" | "jobactivity" | "attachment", jobUUID: string, cursor: string | null) {
+  private async listAuditPage(resource: "email" | "jobactivity" | "attachment" | "sms" | "jobpayment", jobUUID: string, cursor: string | null) {
     uuidSchema.parse(jobUUID);
     if (cursor !== null) uuidSchema.parse(cursor);
-    const filter = resource === "jobactivity"
+    const filter = resource === "jobactivity" || resource === "jobpayment"
       ? `job_uuid eq '${jobUUID}'`
       : `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`;
     const query = new URLSearchParams({ $filter: filter, cursor: cursor ?? "-1" });
@@ -206,6 +206,14 @@ export class ServiceM8Client {
 
   listJobAttachmentsPage(jobUUID: string, cursor: string | null) {
     return this.listAuditPage("attachment", jobUUID, cursor);
+  }
+
+  listJobSmsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("sms", jobUUID, cursor);
+  }
+
+  listJobPaymentsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("jobpayment", jobUUID, cursor);
   }
 
   getCompany(companyUUID: string) {
