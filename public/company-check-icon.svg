@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="RG Company Check">
+  <rect width="256" height="256" rx="48" fill="#0d1b2a"/>
+  <path d="M112 75C95 65 70 68 54 85C35 105 35 151 54 171C70 188 95 191 112 181" fill="none" stroke="#f8f6ef" stroke-width="19" stroke-linecap="round"/>
+  <path d="M197 75C180 65 155 68 139 85C120 105 120 151 139 171C155 188 180 191 197 181" fill="none" stroke="#81d3b0" stroke-width="19" stroke-linecap="round"/>
+</svg>

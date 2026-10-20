@@ -181,6 +181,41 @@ export class ServiceM8Client {
     return { records, nextCursor };
   }
 
+  private async listAuditPage(resource: "email" | "jobactivity" | "attachment" | "sms" | "jobpayment", jobUUID: string, cursor: string | null) {
+    uuidSchema.parse(jobUUID);
+    if (cursor !== null) uuidSchema.parse(cursor);
+    const filter = resource === "jobactivity" || resource === "jobpayment"
+      ? `job_uuid eq '${jobUUID}'`
+      : `related_object eq 'job' and related_object_uuid eq '${jobUUID}'`;
+    const query = new URLSearchParams({ $filter: filter, cursor: cursor ?? "-1" });
+    const response = await this.request(`${resource}.json?${query}`);
+    const records = await response.json() as unknown;
+    if (!Array.isArray(records)) throw new ServiceM8ApiError("ServiceM8 returned an invalid audit list", 502);
+    const nextCursor = response.headers.get("x-next-cursor");
+    if (nextCursor !== null) uuidSchema.parse(nextCursor);
+    return { records, nextCursor };
+  }
+
+  listJobEmailsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("email", jobUUID, cursor);
+  }
+
+  listJobActivitiesPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("jobactivity", jobUUID, cursor);
+  }
+
+  listJobAttachmentsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("attachment", jobUUID, cursor);
+  }
+
+  listJobSmsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("sms", jobUUID, cursor);
+  }
+
+  listJobPaymentsPage(jobUUID: string, cursor: string | null) {
+    return this.listAuditPage("jobpayment", jobUUID, cursor);
+  }
+
   getCompany(companyUUID: string) {
     uuidSchema.parse(companyUUID);
     return this.get(`company/${companyUUID}.json`);

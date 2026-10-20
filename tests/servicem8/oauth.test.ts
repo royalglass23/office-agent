@@ -11,7 +11,7 @@ beforeEach(() => {
     SERVICEM8_APP_ID: "app-id",
     SERVICEM8_APP_SECRET: "app-secret-with-enough-length",
     SERVICEM8_OAUTH_REDIRECT_URI: "https://office.example.test/api/servicem8/oauth/callback",
-    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments",
+    SERVICEM8_OAUTH_SCOPES: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments",
     SERVICEM8_ALLOWED_ACCOUNT_UUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     DATABASE_URL: "postgres://unused",
     TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64"),
@@ -20,7 +20,7 @@ beforeEach(() => {
   resetConfigForTests();
 });
 
-function tokenResponse(scope = "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments") {
+function tokenResponse(scope = "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments") {
   return new Response(JSON.stringify({
     access_token: "access",
     refresh_token: "rotated-refresh",
@@ -34,7 +34,7 @@ describe("ServiceM8 OAuth", () => {
   it("builds the least-privilege authorize request with one-time state", () => {
     const url = buildAuthorizeUrl("state-value");
     expect(url.origin + url.pathname).toBe("https://go.servicem8.com/oauth/authorize");
-    expect(url.searchParams.get("scope")).toBe("vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments");
+    expect(url.searchParams.get("scope")).toBe("vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments");
     expect(url.searchParams.get("state")).toBe("state-value");
   });
 
@@ -57,8 +57,13 @@ describe("ServiceM8 OAuth", () => {
     await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
   });
 
+  it("rejects the previous eight-scope grant until SMS and payment consent is complete", async () => {
+    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments")) as unknown as typeof fetch;
+    await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
+  });
+
   it("rejects any extra scope, including a write scope", async () => {
-    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments manage_jobs")) as unknown as typeof fetch;
+    const fetcher = vi.fn(async () => tokenResponse("vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments manage_jobs")) as unknown as typeof fetch;
     await expect(exchangeAuthorizationCode("code", fetcher)).rejects.toBeInstanceOf(OAuthExchangeError);
   });
 

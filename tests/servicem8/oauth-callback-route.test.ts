@@ -50,7 +50,7 @@ const tokens = {
   accessToken: "private-access-token",
   refreshToken: "private-refresh-token",
   expiresAt: new Date("2026-10-13T00:00:00.000Z"),
-  scopes: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments",
+  scopes: "vendor read_jobs read_customers read_job_notes read_staff read_email read_schedule read_attachments read_sms read_job_payments",
 };
 
 function callbackRequest() {
