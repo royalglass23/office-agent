@@ -1,0 +1,640 @@
+{
+  "capturedAt": "2026-10-27",
+  "source": "ServiceM8 MCP read with same-day Michael UI comparison; staff binding not proven",
+  "jobs": {
+    "R260609": [
+      {
+        "index": 0,
+        "at": "2026-10-25 21:06:13",
+        "type": "diary",
+        "objectType": "Diary",
+        "objectId": "01a17218-897f-7dbb-a2ab-4f86d3337acb",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 1,
+        "at": "2026-10-25 21:06:12",
+        "type": "diary",
+        "objectType": "Diary",
+        "objectId": "01a17218-8908-7dbb-a2ab-253ea96af1eb",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 2,
+        "at": "2026-10-22 08:36:37",
+        "type": "diary",
+        "objectType": "Diary",
+        "objectId": "01a15ff7-2f3a-7dbb-a2ab-428e9dc38c4b",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 3,
+        "at": "2026-09-28 16:12:02",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a0e5ff-8162-7dbb-a2aa-95d654671eab",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 4,
+        "at": "2026-09-22 12:20:44",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a0c67c-8411-7dbb-a2aa-5f8d753ab4bb",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 5,
+        "at": "2026-09-17 11:21:26",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 6,
+        "at": "2026-09-17 11:05:48",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 7,
+        "at": "2026-09-17 08:29:47",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 8,
+        "at": "2026-09-16 11:23:18",
+        "type": "photo",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 9,
+        "at": "2026-09-09 12:40:44",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 10,
+        "at": "2026-09-09 12:38:37",
+        "type": "quote",
+        "objectType": "dboAttachment",
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 11,
+        "at": "2026-09-09 12:26:21",
+        "type": "photos",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 12,
+        "at": "2026-09-08 17:41:23",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 13,
+        "at": "2026-09-08 13:28:33",
+        "type": "service",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 14,
+        "at": "2026-09-08 13:28:32",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a07ea1-8f8f-7dbb-a2aa-1a47b54e0bbb",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 15,
+        "at": "2026-09-08 13:28:32",
+        "type": "job_created",
+        "objectType": "JobStatusChange",
+        "objectId": "01a07ea1-912e-7dbb-a2aa-b78601f5f66b",
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 16,
+        "at": "2026-09-08 13:28:32",
+        "type": "file",
+        "objectType": "dboAttachment",
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 17,
+        "at": "2026-09-08 13:28:32",
+        "type": "file",
+        "objectType": "dboAttachment",
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 18,
+        "at": "2026-09-08 13:28:32",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 19,
+        "at": "2026-09-08 13:19:58",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      }
+    ],
+    "R260611": [
+      {
+        "index": 0,
+        "at": "2026-10-26 22:05:08",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 1,
+        "at": "2026-10-22 10:45:58",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 2,
+        "at": "2026-10-21 22:05:01",
+        "type": "payment",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": false
+      },
+      {
+        "index": 3,
+        "at": "2026-10-21 20:46:28",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 4,
+        "at": "2026-10-21 11:33:38",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 5,
+        "at": "2026-10-21 11:32:51",
+        "type": "invoice",
+        "objectType": "dboAttachment",
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 6,
+        "at": "2026-10-20 06:55:45",
+        "type": "payment",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": false
+      },
+      {
+        "index": 7,
+        "at": "2026-10-19 22:42:14",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 8,
+        "at": "2026-10-07 14:34:32",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 9,
+        "at": "2026-10-07 10:14:23",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 10,
+        "at": "2026-09-24 12:24:46",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 11,
+        "at": "2026-09-24 12:22:28",
+        "type": "status",
+        "objectType": "JobStatusChange",
+        "objectId": "01a0d0ca-d4e0-7dbb-a2ab-47f10a2433ab",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 12,
+        "at": "2026-09-24 12:21:03",
+        "type": "photo",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 13,
+        "at": "2026-09-23 15:49:38",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 14,
+        "at": "2026-09-23 15:17:28",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 15,
+        "at": "2026-09-23 15:14:10",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 16,
+        "at": "2026-09-23 15:11:13",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 17,
+        "at": "2026-09-23 15:11:02",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 18,
+        "at": "2026-09-23 14:19:25",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 19,
+        "at": "2026-09-23 11:50:48",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 20,
+        "at": "2026-09-22 14:50:08",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 21,
+        "at": "2026-09-18 12:29:01",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 22,
+        "at": "2026-09-18 12:22:44",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 23,
+        "at": "2026-09-17 12:47:21",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 24,
+        "at": "2026-09-14 13:56:06",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a09da0-f481-7dbb-a2aa-57198c350b9b",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 25,
+        "at": "2026-09-14 13:41:09",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 26,
+        "at": "2026-09-14 13:40:48",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 27,
+        "at": "2026-09-14 13:40:15",
+        "type": "photos",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 28,
+        "at": "2026-09-14 11:03:43",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 29,
+        "at": "2026-09-14 10:42:27",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 30,
+        "at": "2026-09-14 10:41:57",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 31,
+        "at": "2026-09-14 10:32:41",
+        "type": "quote",
+        "objectType": "JobStatusChange",
+        "objectId": "01a09ce6-b964-7dbb-a2ab-92d4aa6108cb",
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 32,
+        "at": "2026-09-14 10:31:22",
+        "type": "quote",
+        "objectType": "dboAttachment",
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 33,
+        "at": "2026-09-14 10:24:53",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 34,
+        "at": "2026-09-14 08:45:03",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 35,
+        "at": "2026-09-14 00:00:00",
+        "type": "payment",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": false
+      },
+      {
+        "index": 36,
+        "at": "2026-09-12 17:27:51",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 37,
+        "at": "2026-09-10 16:02:24",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 38,
+        "at": "2026-09-10 15:14:43",
+        "type": "reply",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 39,
+        "at": "2026-09-10 13:45:04",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 40,
+        "at": "2026-09-10 13:41:16",
+        "type": "photo",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 41,
+        "at": "2026-09-09 16:21:08",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a08465-efc6-7dbb-a2ab-85faaf4cfb8b",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 42,
+        "at": "2026-09-09 16:07:14",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 43,
+        "at": "2026-09-09 15:56:43",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 44,
+        "at": "2026-09-09 14:16:00",
+        "type": "sms",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 45,
+        "at": "2026-09-09 13:03:58",
+        "type": "email",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "truncated",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 46,
+        "at": "2026-09-09 12:50:24",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a083a5-0213-7dbb-a2aa-7751bf976b8b",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 47,
+        "at": "2026-09-09 12:47:41",
+        "type": "note",
+        "objectType": "dboNote",
+        "objectId": "01a083a2-86d2-7dbb-a2ab-eb042d16aacb",
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 48,
+        "at": "2026-09-09 12:45:15",
+        "type": "job_created",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "empty",
+        "visibleInMichaelUI": true
+      },
+      {
+        "index": 49,
+        "at": "2026-09-09 12:24:03",
+        "type": "call",
+        "objectType": null,
+        "objectId": null,
+        "previewState": "present",
+        "visibleInMichaelUI": true
+      }
+    ]
+  }
+}

@@ -83,6 +83,28 @@ describe("staging MCP Diary routes", () => {
     expect(mocks.connection).not.toHaveBeenCalled();
   });
 
+  it("stops before MCP consent when the signed staff cannot read the requested Job", async () => {
+    mocks.client.mockImplementationOnce(function Client() {
+      return { listJobsByNumber: vi.fn().mockResolvedValue([]), getJob: vi.fn() };
+    });
+    expect((await POST(start())).status).toBe(403);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.probe).not.toHaveBeenCalled();
+  });
+
+  it("stops before MCP consent if the parent Job detail disagrees with the lookup", async () => {
+    mocks.client.mockImplementationOnce(function Client() {
+      return {
+        listJobsByNumber: vi.fn().mockResolvedValue([{ uuid: jobUUID, generated_job_id: "R260609" }]),
+        getJob: vi.fn().mockResolvedValue({ uuid: jobUUID, generated_job_id: "R260611" }),
+      };
+    });
+    expect((await POST(start())).status).toBe(403);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.probe).not.toHaveBeenCalled();
+  });
+
   it("consumes callback state once and returns only redacted metadata", async () => {
     const response = await GET(new Request(`${staging}/assistant/mcp/callback?code=code&state=encrypted`));
     expect(response.status).toBe(200);

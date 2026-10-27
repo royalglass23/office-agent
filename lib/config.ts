@@ -14,6 +14,7 @@ const envSchema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
   SESSION_SIGNING_SECRET: z.string().min(32),
   ASSISTANT_PROOF_ENABLED: z.enum(["true", "false"]).optional().default("false"),
+  STAGING_JOB_SLICE_ENABLED: z.enum(["true", "false"]).optional().default("false"),
   COMPANY_CHECK_ENABLED: z.enum(["true", "false"]).optional().default("false"),
   CC_APP_ID: z.string().min(1).optional(),
   CC_APP_SECRET: z.string().min(16).optional(),
@@ -35,6 +36,7 @@ export type PhaseZeroConfig = {
   tokenEncryptionKey: string;
   sessionSigningSecret: string;
   assistantProof: { enabled: false } | { enabled: true; apiKey: string; model: string };
+  stagingJobSliceEnabled: boolean;
   companyCheck: { enabled: false } | { enabled: true; apiKey: string; model: string; nzbnApiKey: string; appId: string; appSecret: string };
 };
 
@@ -102,6 +104,8 @@ export function getConfig(): PhaseZeroConfig {
     assistantProof: proofEnabled
       ? { enabled: true, apiKey: env.OPENAI_API_KEY!, model: env.OPENAI_MODEL! }
       : { enabled: false },
+    stagingJobSliceEnabled: env.STAGING_JOB_SLICE_ENABLED === "true" &&
+      appBaseUrl.origin === "https://office-agent-staging.vercel.app" && proofEnabled,
     companyCheck: companyCheckEnabled
       ? { enabled: true, apiKey: env.OPENAI_API_KEY!, model: env.OPENAI_RESEARCH_MODEL!,
           nzbnApiKey: env.NZBN_API_KEY!, appId: env.CC_APP_ID!, appSecret: env.CC_APP_SECRET! }

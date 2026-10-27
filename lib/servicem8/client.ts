@@ -134,6 +134,16 @@ export class ServiceM8Client {
     return this.get(`job/${jobUUID}.json`);
   }
 
+  getJobNote(noteUUID: string) {
+    uuidSchema.parse(noteUUID);
+    return this.get(`dbonote/${noteUUID}.json`);
+  }
+
+  getJobEmail(emailUUID: string) {
+    uuidSchema.parse(emailUUID);
+    return this.get(`email/${emailUUID}.json`);
+  }
+
   listJob(jobUUID: string) {
     uuidSchema.parse(jobUUID);
     const query = new URLSearchParams({ $filter: `uuid eq '${jobUUID}'` });

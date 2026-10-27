@@ -1,9 +1,30 @@
 # RG Office Assistant
 
+## Project reference
+
+Start with the [workflow, research and current evidence index](docs/workflow-reference/README.md)
+for saved charts, history findings, unresolved policy decisions and the latest verification reports.
+Read its current checkpoint before relying on older implementation descriptions below.
+
 RG-380 currently blocks Job summaries, email drafts and recommendations while the full ServiceM8
 Job Diary UI/API audit and per-Job completeness check are incomplete. The add-on can still open
 and search for a Job. The description below documents the bounded proof behind that release gate;
 it is not a claim that Job outputs are available now.
+
+## Bounded staging Job slice
+
+The local staging slice is disabled by default. On the exact
+`https://office-agent-staging.vercel.app` origin, `STAGING_JOB_SLICE_ENABLED=true` with the
+existing assistant proof controls makes the signed global Add-ons-menu launch show an exact Job
+lookup and three read-only communication checks. The backend uses the signed staff/account session
+and existing OAuth `ServiceM8Client`; it does not use the local account key. Every request checks
+the parent Job before reading child records. Answers and editable drafts cite full REST
+Email/SMS/Note sources and show the unverified Diary/call/file gaps. The global RG-380 Job-output
+gate remains closed. There is no ServiceM8 write or send action.
+
+This code has not been deployed or tested through a signed-in ServiceM8 staging launch. The known
+“Invalid Response Received” launch must be diagnosed with the actual add-on registration/callback
+and hosting configuration. Do not enable the flag or claim staging acceptance from local tests.
 
 Bounded read-only ServiceM8 Office Assistant. A fresh, one-time global Add-ons-menu launch binds a
 short-lived server session to the signed staff identity. In the initial Phase 1 conversation, staff

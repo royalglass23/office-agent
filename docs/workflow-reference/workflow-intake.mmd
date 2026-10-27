@@ -1,0 +1,11 @@
+flowchart TD
+A["A · New Enquiry /<br/>Existing Customer Request"] --> B["B · Create or Locate<br/>ServiceM8 Job"]
+B --> C["C · Capture Client, Site Address,<br/>Scope, Photos and Plans"]
+C --> D{"D · Information<br/>Complete?"}
+D -- No --> E["E · Request Missing Details<br/>and Set Follow-up"]
+E --> D
+D -- Yes --> F{"F · Project Fit<br/>and Priority"}
+F -- Not Suitable --> G["G · Record Reason / No Bid"]
+F -- Suitable --> NEXT["Continue to 2 · Technical review"]
+classDef decision fill:#fff3d6,stroke:#a46a15;
+class D,F decision;

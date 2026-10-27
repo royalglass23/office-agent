@@ -18,6 +18,7 @@ beforeEach(() => {
     SESSION_SIGNING_SECRET: "session-secret-with-at-least-thirty-two-bytes",
   };
   delete process.env.ASSISTANT_PROOF_ENABLED;
+  delete process.env.STAGING_JOB_SLICE_ENABLED;
   delete process.env.COMPANY_CHECK_ENABLED;
   delete process.env.CC_APP_ID;
   delete process.env.CC_APP_SECRET;
@@ -63,6 +64,21 @@ describe("bounded assistant proof configuration", () => {
       apiKey: "test-key",
       model: "gpt-test",
     });
+  });
+
+  it("enables the Job slice only on the exact staging origin with the proof enabled", () => {
+    process.env.STAGING_JOB_SLICE_ENABLED = "true";
+    expect(getConfig().stagingJobSliceEnabled).toBe(false);
+    resetConfigForTests();
+    process.env.ASSISTANT_PROOF_ENABLED = "true";
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+    process.env.OPENAI_DATA_CONTROLS_VERIFIED = "true";
+    expect(getConfig().stagingJobSliceEnabled).toBe(false);
+    resetConfigForTests();
+    process.env.APP_BASE_URL = "https://office-agent-staging.vercel.app";
+    process.env.SERVICEM8_OAUTH_REDIRECT_URI = "https://office-agent-staging.vercel.app/api/servicem8/oauth/callback";
+    expect(getConfig().stagingJobSliceEnabled).toBe(true);
   });
 
   it("keeps the company report independent of the Job proof flag and requires its own model", () => {

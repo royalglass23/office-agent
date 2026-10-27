@@ -1,0 +1,7 @@
+{
+  "scriptsSha256": {
+    "review-servicem8-history.ts": "00204067c0a287b840473c9c34cdb0b17673a936bcaabfc1d73c23f5bf612587",
+    "review-outbound-patterns.ts": "e87c946d08c178e3ce7a7bc8d7bb3518ae959bdf87c9c8c495f89aa33ec1faa6"
+  },
+  "note": "Scripts remain in the chat working folder; the reference folder contains only derived findings and methods, not raw customer bodies."
+}

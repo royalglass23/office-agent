@@ -75,6 +75,34 @@ describe("one-time staging MCP Diary probe", () => {
     expect(fetcher).toHaveBeenCalledTimes(4);
   });
 
+  it("flags visibly shortened previews without returning their contents or claiming full coverage", async () => {
+    const fetcher = vi.fn(async (_url, init) => {
+      const message = JSON.parse(init.body as string);
+      if (message.method === "initialize") return Response.json({ jsonrpc: "2.0", id: 1, result: {} });
+      if (message.method === "notifications/initialized") return new Response(null, { status: 202 });
+      if (message.method === "tools/list") return Response.json({ jsonrpc: "2.0", id: 2, result: { tools: [{ name: "get_job_diary" }] } });
+      return Response.json({ jsonrpc: "2.0", id: 3, result: { content: [{ type: "text", text: JSON.stringify({
+        job_uuid: identity.jobUUID,
+        entries: [
+          { timestamp: "2026-09-08 13:28:33", content_preview: "Customer asked about..." },
+          { timestamp: "2026-09-08 13:28:34", content_preview: "File added" },
+          { timestamp: "2026-09-08 13:28:35", content_preview: "" },
+        ],
+      }) }] } });
+    }) as unknown as typeof fetch;
+
+    const result = await probeMcpDiary("one-time-token", identity.jobUUID, fetcher);
+    expect(result).toMatchObject({
+      status: "inventory_only", staffBinding: "unverified", fullContent: "unverified", pagination: "unverified",
+      entries: [
+        { previewEndsInEllipsis: true },
+        { previewEndsInEllipsis: false },
+        { previewEndsInEllipsis: false },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain("Customer asked about");
+  });
+
   it("fails closed if the Diary tool is missing", async () => {
     const fetcher = vi.fn(async (_url, init) => {
       const message = JSON.parse(init.body as string);

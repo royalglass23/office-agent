@@ -13,6 +13,7 @@ import {
 } from "@/lib/servicem8/render-context-html";
 import { EventVerificationError, verifyServiceM8Event } from "@/lib/servicem8/verify-event";
 import { consumeEventHash } from "@/lib/storage/consumed-events";
+import { renderStagingJobSlice } from "@/lib/servicem8/staging-job-slice-html";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,11 @@ export async function POST(request: Request) {
           issueAssistantGreetingSession(verified.event.auth, config.sessionSigningSecret),
         ]);
         safeLog("info", "Completed global menu launch", identifiers);
+        if (config.stagingJobSliceEnabled) {
+          return addonResponse(renderStagingJobSlice({
+            actionUrl: new URL("/assistant/staging", config.appBaseUrl), session,
+          }));
+        }
         return addonResponse(renderConversationAssistant(
           null,
           new URL("/assistant", config.appBaseUrl),

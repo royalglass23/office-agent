@@ -54,6 +54,24 @@ describe("ServiceM8Client", () => {
     expect(new Headers(init.headers).get("x-impersonate-uuid")).toBe(staffUUID);
   });
 
+  it("reads Email and Note detail only by validated IDs under staff impersonation", async () => {
+    const fetcher = vi.fn(async () => Response.json({ uuid: jobUUID })) as unknown as typeof fetch;
+    const client = new ServiceM8Client(accountUUID, staffUUID, {
+      fetcher,
+      now: () => new Date("2030-01-01T00:00:00Z"),
+      getConnection: vi.fn(async () => validConnection),
+    });
+    await client.getJobEmail(jobUUID);
+    await client.getJobNote(jobUUID);
+    const calls = (fetcher as ReturnType<typeof vi.fn>).mock.calls as [URL, RequestInit][];
+    expect(calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      `/api_1.0/email/${jobUUID}.json`, `/api_1.0/dbonote/${jobUUID}.json`,
+    ]);
+    expect(calls.every(([, init]) => init.method === "GET" && new Headers(init.headers).get("x-impersonate-uuid") === staffUUID)).toBe(true);
+    expect(() => client.getJobEmail("invalid-id")).toThrow();
+    expect(calls).toHaveLength(2);
+  });
+
   it("looks up only the explicitly supplied Job numbers with exact filters", async () => {
     const fetcher = vi.fn(async (url: URL) => Response.json([{
       uuid: jobUUID,

@@ -10,6 +10,7 @@ const { consumeEventHash, clientConstructor, getConfig, getStaff, issueAssistant
     sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
     allowedAccountUUID: "5e32b1f1-bb9f-457a-a67c-44dd7ff8ac1b",
     assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
+    stagingJobSliceEnabled: false,
   })),
   getStaff: vi.fn(async (staffUUID: string) => ({ uuid: staffUUID, first: "May", last: "Yang" })),
   issueAssistantGreetingSession: vi.fn(async () => "signed-greeting-session"),
@@ -84,6 +85,7 @@ describe("ServiceM8 event route", () => {
       sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
       allowedAccountUUID: event.auth.accountUUID,
       assistantProof: { enabled: false } as { enabled: boolean; apiKey?: string; model?: string },
+      stagingJobSliceEnabled: false,
     });
   });
 
@@ -130,6 +132,7 @@ describe("ServiceM8 event route", () => {
       sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
       allowedAccountUUID: "123e4567-cb72-4d94-8a1e-d454131257eb",
       assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
+      stagingJobSliceEnabled: false,
     });
     const now = Math.floor(Date.now() / 1000);
 
@@ -208,6 +211,7 @@ describe("ServiceM8 event route", () => {
       sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
       allowedAccountUUID: event.auth.accountUUID,
       assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
+      stagingJobSliceEnabled: false,
     });
     const now = Math.floor(Date.now() / 1000);
     const response = await POST(new Request("https://office.example.test/api/servicem8/events", {
@@ -234,6 +238,28 @@ describe("ServiceM8 event route", () => {
     expect(eventResponse).toContain("What happened to R260766?");
     expect(eventResponse).not.toContain(event.auth.accountUUID);
     expect(eventResponse).not.toContain(event.auth.staffUUID);
+  });
+
+  it("opens only the signed staging Job slice when its local flag is enabled", async () => {
+    getConfig.mockReturnValueOnce({
+      appBaseUrl: new URL("https://office-agent-staging.vercel.app"),
+      serviceM8AppSecret: "phase-zero-test-secret-that-is-long-enough",
+      sessionSigningSecret: "session-secret-with-at-least-thirty-two-bytes",
+      allowedAccountUUID: event.auth.accountUUID,
+      assistantProof: { enabled: true, apiKey: "test-key", model: "gpt-test" },
+      stagingJobSliceEnabled: true,
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const response = await POST(new Request("https://office-agent-staging.vercel.app/api/servicem8/events", {
+      method: "POST",
+      body: await sign({ ...menuEvent, iat: now - 1, jti: "staging-menu-launch" }),
+    }));
+    expect(response.status).toBe(200);
+    const { eventResponse } = await response.json();
+    expect(eventResponse).toContain('action="https://office-agent-staging.vercel.app/assistant/staging"');
+    expect(eventResponse).toContain('value="signed-assistant-session"');
+    expect(eventResponse).not.toContain(event.auth.staffUUID);
+    expect(clientConstructor).not.toHaveBeenCalled();
   });
 
   it("rejects a replayed fresh global menu launch before API access", async () => {

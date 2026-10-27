@@ -1,0 +1,6 @@
+flowchart TD
+X["X · Invoice and<br/>Accounts Follow-up"] --> Y{"Y · Payment<br/>Reconciled?"}
+Y -- No --> X
+Y -- Yes --> Z["Z · Close Job / Warranty /<br/>Customer Follow-up"]
+classDef decision fill:#fff3d6,stroke:#a46a15;
+class Y decision;

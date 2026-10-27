@@ -1,0 +1,15 @@
+flowchart TD
+H["H · Technical Review<br/>and Scope Confirmation"] --> I{"I · Site Measure<br/>Required?"}
+I -- Yes --> J["J · Arrange Site Visit<br/>and Verify Conditions"]
+I -- No --> K["K · Prepare Quotation"]
+J --> K
+K --> L["L · Issue Quote<br/>and Set Next Action"]
+L --> M{"M · Customer<br/>Decision"}
+M -- Revise --> H
+M -- No Response --> N["N · Scheduled Follow-up / Hold"]
+N --> M
+M -- Declined --> O["O · Record Lost Reason"]
+M -- Accepted --> P["P · Confirm Work Order<br/>and Payment Terms"]
+P --> NEXT["Continue to 3 · Delivery"]
+classDef decision fill:#fff3d6,stroke:#a46a15;
+class I,M decision;

@@ -1,0 +1,42 @@
+flowchart TD
+ A["New Enquiry / Existing Customer Request"] --> B["Create or Locate ServiceM8 Job"]
+ B --> C["Capture Client, Site Address, Scope, Photos and Plans"]
+ C --> D{"Information Complete?"}
+ D -- No --> E["Request Missing Details and Set Follow-up"]
+ E --> D
+ D -- Yes --> F{"Project Fit and Priority"}
+ F -- Not Suitable --> G["Record Reason / No Bid"]
+ F -- Suitable --> H["Technical Review and Scope Confirmation"]
+ H --> I{"Site Measure Required?"}
+ I -- Yes --> J["Arrange Site Visit and Verify Conditions"]
+ I -- No --> K["Prepare Quotation"]
+ J --> K
+ K --> L["Issue Quote and Set Next Action"]
+ L --> M{"Customer Decision"}
+ M -- Revise --> H
+ M -- No Response --> N["Scheduled Follow-up / Hold"]
+ N --> M
+ M -- Declined --> O["Record Lost Reason"]
+ M -- Accepted --> P["Confirm Work Order and Payment Terms"]
+ P --> Q["Order Materials and Schedule Booking"]
+ Q --> R{"Site and Materials Ready?"}
+ R -- No --> S["Resolve Blockers / Reschedule"]
+ S --> R
+ R -- Yes --> T["Installation and Site Records"]
+ T --> U{"Quality Check Passed?"}
+ U -- No --> V["Rectification / Variation"]
+ V --> T
+ U -- Yes --> W["Completion Documents / PS3 if Required"]
+ W --> X["Invoice and Accounts Follow-up"]
+ X --> Y{"Payment Reconciled?"}
+ Y -- No --> X
+ Y -- Yes --> Z["Close Job / Warranty / Customer Follow-up"]
+ subgraph MANAGEMENT["Management and Automation"]
+ AA["Job Owner and Next Booking"]
+ AB["Missing Information Alerts"]
+ AC["Quote Follow-up"]
+ AD["Daily Job Status Reporting"]
+ end
+ B -.-> AA
+ E -.-> AB
+ L -.-> AC

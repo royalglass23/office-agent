@@ -170,6 +170,8 @@ export async function probeMcpDiary(token: string, jobUUID: string, fetcher: typ
     entries: diary.entries.map((entry) => ({
       at: entry.timestamp ?? null, objectType: entry.object_type ?? null,
       hasObjectUUID: Boolean(entry.object_uuid), previewLength: entry.content_preview?.length ?? 0,
+      // A visible ellipsis is evidence of shortening, never evidence that other previews are complete.
+      previewEndsInEllipsis: /(?:\.\.\.|\u2026)\s*$/.test(entry.content_preview ?? ""),
     })),
   };
 }

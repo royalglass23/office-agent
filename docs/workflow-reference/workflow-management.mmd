@@ -1,0 +1,10 @@
+flowchart TD
+JOBS["ServiceM8 job facts<br/>and authorised history"] --> RULES["Approved rules + due dates<br/>and evidence coverage"]
+RULES --> AA["AA · Job Owner and Next Booking"]
+RULES --> AB["AB · Missing Information Alerts"]
+RULES --> AC["AC · Quote Follow-up"]
+RULES --> AD["AD · Daily Job Status Reporting"]
+AA --> QUEUE["Personal staff attention queue<br/>and manager exception view"]
+AB --> QUEUE
+AC --> QUEUE
+AD --> QUEUE

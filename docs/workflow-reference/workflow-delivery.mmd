@@ -1,0 +1,12 @@
+flowchart TD
+Q["Q · Order Materials<br/>and Schedule Booking"] --> R{"R · Site and<br/>Materials Ready?"}
+R -- No --> S["S · Resolve Blockers / Reschedule"]
+S --> R
+R -- Yes --> T["T · Installation and Site Records"]
+T --> U{"U · Quality<br/>Check Passed?"}
+U -- No --> V["V · Rectification / Variation"]
+V --> T
+U -- Yes --> W["W · Completion Documents /<br/>PS3 if Required"]
+W --> NEXT["Continue to 4 · Accounts and close"]
+classDef decision fill:#fff3d6,stroke:#a46a15;
+class R,U decision;

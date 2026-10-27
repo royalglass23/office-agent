@@ -1,0 +1,14 @@
+flowchart TD
+STAFF["Staff member in ServiceM8"] --> LAUNCH["Hosted Add-on launch<br/>verified account and staff session"]
+LAUNCH --> APP["Office Agent · Next.js / TypeScript<br/>hosted on Vercel"]
+APP <--> AI["OpenAI Responses API<br/>conversation and tool requests"]
+APP --> POLICY["Tool gateway<br/>authorisation · evidence coverage<br/>validation · approvals"]
+POLICY --> READ["Read tools<br/>get_my_work_queue / get_job<br/>get_job_diary"]
+POLICY --> DRAFT["Preparation tools<br/>prepare_quote / prepare_booking<br/>prepare_invoice"]
+POLICY --> WRITE["Later write tools<br/>exact preview + staff approval<br/>fresh state check + audit"]
+READ --> SM8["ServiceM8 REST / supported adapters<br/>Jobs · Diary · quotes · bookings<br/>invoices · attachments"]
+WRITE --> SM8
+SM8 -. verified events .-> TASKS["Bounded background tasks<br/>due checks · retry · deduplicate"]
+TASKS --> POLICY
+APP <--> DB["Managed PostgreSQL<br/>approved company knowledge<br/>staff preferences · tasks · audit"]
+TASKS <--> DB

@@ -1,0 +1,7 @@
+flowchart TD
+GATE["1 · Prove full authorised Diary<br/>RG-381 + same-staff UI/API parity"] --> POLICY["2 · Approve stage mapping,<br/>ownership and priority rules"]
+POLICY --> PILOT["3 · Verify attention queue<br/>assignments + approved priority rules"]
+PILOT --> ATTENTION["4 · Read-only staff pilot<br/>summary + draft + manual daily report"]
+ATTENTION --> SCHEDULE["5 · Approved scheduled checks<br/>and event-triggered refresh"]
+SCHEDULE --> TOOLS["6 · Add one reviewed write tool<br/>at a time"]
+TOOLS --> EXPAND["7 · Procurement, documents<br/>and accounts adapters as needed"]

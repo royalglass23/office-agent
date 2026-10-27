@@ -1,0 +1,1000 @@
+{
+  "cutoff": "2026-10-23 16:29:22",
+  "scope": "outbound only; enhanced HTML, quoted history and signature stripping; regex screening, not manual classification",
+  "pages": 27,
+  "unique": 26505,
+  "duplicates": 26,
+  "empty": 70,
+  "characters": 11225492,
+  "categories": {
+    "request_photos_plans": {
+      "count": 3173,
+      "years": {
+        "2022": 420,
+        "2023": 432,
+        "2024": 560,
+        "2025": 1017,
+        "2026": 744
+      },
+      "staff": {
+        "S-826725e652325f44": 743,
+        "S-123ecae91a80d0c5": 142,
+        "S-e3a4069bdc742c66": 1153,
+        "S-c74d4b12250e049b": 5,
+        "S-396e9609aef741a4": 274,
+        "S-8688eea883a556bb": 5,
+        "S-ab26daf4252e1cd5": 343,
+        "S-823983183ccd5a7e": 105,
+        "S-51dcb7914f9d6cd8": 403
+      },
+      "evidence": [
+        {
+          "record": "E-6fb99ec85564671f",
+          "job": "J-35b54a350ac5c44a",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 15:59:47"
+        },
+        {
+          "record": "E-7584fa32f25ff884",
+          "job": "J-ab961b0a0ba30e5e",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-23 08:35:28"
+        },
+        {
+          "record": "E-a6ad76764050cf98",
+          "job": "J-381835d0765fd70c",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-23 08:11:02"
+        },
+        {
+          "record": "E-a128b774a3d1733f",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-22 17:42:37"
+        },
+        {
+          "record": "E-fd706cfea3a41085",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-22 12:52:36"
+        }
+      ],
+      "uniqueJobs": 1657
+    },
+    "lead_time_conditional": {
+      "count": 1287,
+      "years": {
+        "2022": 127,
+        "2023": 285,
+        "2024": 290,
+        "2025": 371,
+        "2026": 214
+      },
+      "staff": {
+        "S-826725e652325f44": 159,
+        "S-e3a4069bdc742c66": 816,
+        "S-123ecae91a80d0c5": 61,
+        "S-396e9609aef741a4": 47,
+        "S-c74d4b12250e049b": 1,
+        "S-ab26daf4252e1cd5": 66,
+        "S-823983183ccd5a7e": 3,
+        "S-51dcb7914f9d6cd8": 134
+      },
+      "evidence": [
+        {
+          "record": "E-de6d8d34bf764fd2",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 14:43:59"
+        },
+        {
+          "record": "E-897d6d168137c79c",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 08:14:54"
+        },
+        {
+          "record": "E-a128b774a3d1733f",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-22 17:42:37"
+        },
+        {
+          "record": "E-183c251f01db00b6",
+          "job": "J-7eb4c4518717086e",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-21 16:23:30"
+        },
+        {
+          "record": "E-bb20fc8cd4c336a5",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-21 11:29:56"
+        }
+      ],
+      "uniqueJobs": 862
+    },
+    "request_dimensions": {
+      "count": 1100,
+      "years": {
+        "2022": 144,
+        "2023": 206,
+        "2024": 218,
+        "2025": 274,
+        "2026": 258
+      },
+      "staff": {
+        "S-826725e652325f44": 88,
+        "S-e3a4069bdc742c66": 504,
+        "S-123ecae91a80d0c5": 76,
+        "S-c74d4b12250e049b": 3,
+        "S-396e9609aef741a4": 136,
+        "S-ab26daf4252e1cd5": 152,
+        "S-823983183ccd5a7e": 14,
+        "S-51dcb7914f9d6cd8": 127
+      },
+      "evidence": [
+        {
+          "record": "E-ae666496adc7a807",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 12:49:15"
+        },
+        {
+          "record": "E-b9f7e192d893dd46",
+          "job": "J-060cca237c6bdcba",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 09:06:15"
+        },
+        {
+          "record": "E-ca67ae4239af5dd2",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-22 17:39:25"
+        },
+        {
+          "record": "E-fd706cfea3a41085",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-22 12:52:36"
+        },
+        {
+          "record": "E-34d180580c235198",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 13:27:41"
+        }
+      ],
+      "uniqueJobs": 736
+    },
+    "final_measure_after_finishes": {
+      "count": 67,
+      "years": {
+        "2022": 9,
+        "2023": 16,
+        "2024": 5,
+        "2025": 21,
+        "2026": 16
+      },
+      "staff": {
+        "S-826725e652325f44": 6,
+        "S-e3a4069bdc742c66": 47,
+        "S-123ecae91a80d0c5": 5,
+        "S-396e9609aef741a4": 3,
+        "S-ab26daf4252e1cd5": 5,
+        "S-51dcb7914f9d6cd8": 1
+      },
+      "evidence": [
+        {
+          "record": "E-ae666496adc7a807",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 12:49:15"
+        },
+        {
+          "record": "E-34d180580c235198",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 13:27:41"
+        },
+        {
+          "record": "E-55e2d9a759bc3582",
+          "job": "J-6a93b7cc153ee40c",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-14 11:23:08"
+        },
+        {
+          "record": "E-2a7240e9de691ae9",
+          "job": "J-6759dbf36a48ad8f",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-01 12:00:00"
+        },
+        {
+          "record": "E-27fe4be63cf08adf",
+          "job": "J-f317e4836aef2148",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-09-30 16:07:27"
+        }
+      ],
+      "uniqueJobs": 57
+    },
+    "measurement_installation_responsibility": {
+      "count": 91,
+      "years": {
+        "2022": 3,
+        "2023": 4,
+        "2024": 17,
+        "2025": 33,
+        "2026": 34
+      },
+      "staff": {
+        "S-826725e652325f44": 10,
+        "S-e3a4069bdc742c66": 48,
+        "S-123ecae91a80d0c5": 2,
+        "S-396e9609aef741a4": 17,
+        "S-ab26daf4252e1cd5": 13,
+        "S-51dcb7914f9d6cd8": 1
+      },
+      "evidence": [
+        {
+          "record": "E-ae666496adc7a807",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 12:49:15"
+        },
+        {
+          "record": "E-ca67ae4239af5dd2",
+          "job": "J-2cdec0f01874deaa",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-22 17:39:25"
+        },
+        {
+          "record": "E-34d180580c235198",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 13:27:41"
+        },
+        {
+          "record": "E-31ffca9aa34eddfe",
+          "job": "J-16b72110a4e8fe1a",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-05 13:21:09"
+        },
+        {
+          "record": "E-69f45a5f2754413f",
+          "job": "J-b0835bab0d1cfba5",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-05 09:46:40"
+        }
+      ],
+      "uniqueJobs": 80
+    },
+    "deposit_before_progress": {
+      "count": 557,
+      "years": {
+        "2022": 54,
+        "2023": 116,
+        "2024": 114,
+        "2025": 171,
+        "2026": 102
+      },
+      "staff": {
+        "S-826725e652325f44": 104,
+        "S-e3a4069bdc742c66": 257,
+        "S-123ecae91a80d0c5": 32,
+        "S-396e9609aef741a4": 61,
+        "S-ab26daf4252e1cd5": 35,
+        "S-823983183ccd5a7e": 10,
+        "S-51dcb7914f9d6cd8": 58
+      },
+      "evidence": [
+        {
+          "record": "E-f252eeda8d9cafd8",
+          "job": "J-4e412472fc1adfa5",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 12:15:39"
+        },
+        {
+          "record": "E-897d6d168137c79c",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 08:14:54"
+        },
+        {
+          "record": "E-6d37e22f85e62177",
+          "job": "J-4e4d0f2610cb32e3",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 17:01:25"
+        },
+        {
+          "record": "E-b89b1c3b1a8acb56",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 16:01:41"
+        },
+        {
+          "record": "E-43e57a5c0f0e8d5d",
+          "job": "J-4e4d0f2610cb32e3",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 15:44:01"
+        }
+      ],
+      "uniqueJobs": 378
+    },
+    "deposit_terms": {
+      "count": 1096,
+      "years": {
+        "2022": 125,
+        "2023": 288,
+        "2024": 279,
+        "2025": 254,
+        "2026": 150
+      },
+      "staff": {
+        "S-826725e652325f44": 124,
+        "S-e3a4069bdc742c66": 519,
+        "S-123ecae91a80d0c5": 41,
+        "S-396e9609aef741a4": 94,
+        "S-ab26daf4252e1cd5": 164,
+        "S-823983183ccd5a7e": 22,
+        "S-51dcb7914f9d6cd8": 132
+      },
+      "evidence": [
+        {
+          "record": "E-f252eeda8d9cafd8",
+          "job": "J-4e412472fc1adfa5",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-23 12:15:39"
+        },
+        {
+          "record": "E-b6f062e288f29386",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 08:41:11"
+        },
+        {
+          "record": "E-897d6d168137c79c",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 08:14:54"
+        },
+        {
+          "record": "E-6d37e22f85e62177",
+          "job": "J-4e4d0f2610cb32e3",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 17:01:25"
+        },
+        {
+          "record": "E-b89b1c3b1a8acb56",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 16:01:41"
+        }
+      ],
+      "uniqueJobs": 608
+    },
+    "customer_hold": {
+      "count": 162,
+      "years": {
+        "2022": 21,
+        "2023": 41,
+        "2024": 21,
+        "2025": 35,
+        "2026": 44
+      },
+      "staff": {
+        "S-e3a4069bdc742c66": 80,
+        "S-c74d4b12250e049b": 1,
+        "S-826725e652325f44": 16,
+        "S-123ecae91a80d0c5": 4,
+        "S-396e9609aef741a4": 15,
+        "S-ab26daf4252e1cd5": 7,
+        "S-ef472d682f2e3d25": 1,
+        "S-823983183ccd5a7e": 1,
+        "S-51dcb7914f9d6cd8": 37
+      },
+      "evidence": [
+        {
+          "record": "E-b9f7e192d893dd46",
+          "job": "J-060cca237c6bdcba",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 09:06:15"
+        },
+        {
+          "record": "E-a128b774a3d1733f",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-22 17:42:37"
+        },
+        {
+          "record": "E-d6914c3fc1641b00",
+          "job": "J-0ff8a7c4033c66c3",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-10-16 16:29:46"
+        },
+        {
+          "record": "E-7bd96f4a421bdc25",
+          "job": "J-c0e56e4ec92d79db",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-08 16:30:32"
+        },
+        {
+          "record": "E-5cc3855482379eac",
+          "job": "J-bd63a0c08bd55e1c",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-05 14:11:35"
+        }
+      ],
+      "uniqueJobs": 139
+    },
+    "payment_chasing": {
+      "count": 229,
+      "years": {
+        "2022": 12,
+        "2023": 36,
+        "2024": 110,
+        "2025": 47,
+        "2026": 24
+      },
+      "staff": {
+        "S-e3a4069bdc742c66": 135,
+        "S-123ecae91a80d0c5": 9,
+        "S-396e9609aef741a4": 18,
+        "S-826725e652325f44": 25,
+        "S-ab26daf4252e1cd5": 14,
+        "S-823983183ccd5a7e": 3,
+        "S-51dcb7914f9d6cd8": 25
+      },
+      "evidence": [
+        {
+          "record": "E-b6f062e288f29386",
+          "job": "J-3b193524ceb1c908",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-23 08:41:11"
+        },
+        {
+          "record": "E-1a040b054a7418b8",
+          "job": "J-d9cf9b7eeab3f479",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-07 11:14:11"
+        },
+        {
+          "record": "E-ffe014567fcadd14",
+          "job": "J-d9cf9b7eeab3f479",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-07 10:41:09"
+        },
+        {
+          "record": "E-3f711cccc61be689",
+          "job": "J-aac829e29ddd01bd",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-09-07 16:01:56"
+        },
+        {
+          "record": "E-1ca0bd4450493516",
+          "job": "J-0d36dcefe977ac4b",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-08-21 10:35:17"
+        }
+      ],
+      "uniqueJobs": 157
+    },
+    "provisional_booking": {
+      "count": 95,
+      "years": {
+        "2022": 3,
+        "2023": 8,
+        "2024": 10,
+        "2025": 46,
+        "2026": 28
+      },
+      "staff": {
+        "S-826725e652325f44": 59,
+        "S-123ecae91a80d0c5": 2,
+        "S-396e9609aef741a4": 9,
+        "S-e3a4069bdc742c66": 17,
+        "S-ab26daf4252e1cd5": 4,
+        "S-51dcb7914f9d6cd8": 4
+      },
+      "evidence": [
+        {
+          "record": "E-54c519eb5f8add25",
+          "job": "J-35b54a350ac5c44a",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-22 15:59:40"
+        },
+        {
+          "record": "E-0857daf7e8bee18a",
+          "job": "J-2fc958090f0314ed",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-22 15:21:14"
+        },
+        {
+          "record": "E-183c251f01db00b6",
+          "job": "J-7eb4c4518717086e",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-21 16:23:30"
+        },
+        {
+          "record": "E-a5a51cfce2035c28",
+          "job": "J-2fc958090f0314ed",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-16 13:12:53"
+        },
+        {
+          "record": "E-7fb275fff6f70e47",
+          "job": "J-b4fd7c93c7f94f84",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-15 16:19:07"
+        }
+      ],
+      "uniqueJobs": 85
+    },
+    "drawing_confirmation": {
+      "count": 180,
+      "years": {
+        "2022": 20,
+        "2023": 34,
+        "2024": 28,
+        "2025": 48,
+        "2026": 50
+      },
+      "staff": {
+        "S-123ecae91a80d0c5": 28,
+        "S-826725e652325f44": 28,
+        "S-e3a4069bdc742c66": 85,
+        "S-396e9609aef741a4": 22,
+        "S-ab26daf4252e1cd5": 10,
+        "S-51dcb7914f9d6cd8": 7
+      },
+      "evidence": [
+        {
+          "record": "E-218f490b82560b03",
+          "job": "J-72b79fd2cd3611fa",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-22 11:49:18"
+        },
+        {
+          "record": "E-34d180580c235198",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 13:27:41"
+        },
+        {
+          "record": "E-b3d8132f573a6f47",
+          "job": "J-b4fd7c93c7f94f84",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-08 16:09:56"
+        },
+        {
+          "record": "E-9913b19d14429229",
+          "job": "J-dcd742a091584acd",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-07 12:29:58"
+        },
+        {
+          "record": "E-565754706e5cad50",
+          "job": "J-1fe1e82d376e910a",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-05 08:56:48"
+        }
+      ],
+      "uniqueJobs": 134
+    },
+    "completion_documentation": {
+      "count": 2069,
+      "years": {
+        "2022": 166,
+        "2023": 694,
+        "2024": 403,
+        "2025": 442,
+        "2026": 364
+      },
+      "staff": {
+        "S-123ecae91a80d0c5": 95,
+        "S-c74d4b12250e049b": 7,
+        "S-e3a4069bdc742c66": 899,
+        "S-826725e652325f44": 146,
+        "S-396e9609aef741a4": 284,
+        "S-8688eea883a556bb": 1,
+        "S-ab26daf4252e1cd5": 180,
+        "S-823983183ccd5a7e": 114,
+        "S-51dcb7914f9d6cd8": 343
+      },
+      "evidence": [
+        {
+          "record": "E-b3dccde9161a8fa0",
+          "job": "J-4f21b2773378dd59",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-22 11:48:16"
+        },
+        {
+          "record": "E-b4ea63717f3811b8",
+          "job": "J-d393d9f6bc4c438d",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-10-19 12:13:12"
+        },
+        {
+          "record": "E-330b6e20c8e5212c",
+          "job": "J-6e5020c5a7855f84",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-18 13:24:21"
+        },
+        {
+          "record": "E-054e15bccf395dec",
+          "job": "J-f8f85a1fb872e146",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-17 02:46:56"
+        },
+        {
+          "record": "E-0bc33b1c8bb933eb",
+          "job": "J-d196f80865ebf314",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-10-15 14:20:30"
+        }
+      ],
+      "uniqueJobs": 1129
+    },
+    "call_instead": {
+      "count": 602,
+      "years": {
+        "2022": 40,
+        "2023": 169,
+        "2024": 290,
+        "2025": 53,
+        "2026": 50
+      },
+      "staff": {
+        "S-826725e652325f44": 25,
+        "S-123ecae91a80d0c5": 17,
+        "S-e3a4069bdc742c66": 249,
+        "S-396e9609aef741a4": 17,
+        "S-41da3074f6cb7aa5": 1,
+        "S-ab26daf4252e1cd5": 182,
+        "S-823983183ccd5a7e": 94,
+        "S-51dcb7914f9d6cd8": 17
+      },
+      "evidence": [
+        {
+          "record": "E-2f1c3d3deb3ee167",
+          "job": "J-7eb4c4518717086e",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-21 14:45:42"
+        },
+        {
+          "record": "E-8200390076225c73",
+          "job": "J-38b0f278a375af04",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-01 12:29:29"
+        },
+        {
+          "record": "E-1f9f5db0f480d68f",
+          "job": "J-38b0f278a375af04",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-01 12:28:54"
+        },
+        {
+          "record": "E-8507af05f31a189e",
+          "job": "J-dcd742a091584acd",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-09-29 14:16:08"
+        },
+        {
+          "record": "E-53c46c3b4d821c6d",
+          "job": "J-302a4e3058b64606",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-09-22 08:32:43"
+        }
+      ],
+      "uniqueJobs": 441
+    },
+    "quote_followup": {
+      "count": 408,
+      "years": {
+        "2022": 20,
+        "2023": 70,
+        "2024": 61,
+        "2025": 115,
+        "2026": 142
+      },
+      "staff": {
+        "S-c74d4b12250e049b": 4,
+        "S-123ecae91a80d0c5": 7,
+        "S-396e9609aef741a4": 196,
+        "S-826725e652325f44": 24,
+        "S-e3a4069bdc742c66": 104,
+        "S-ab26daf4252e1cd5": 53,
+        "S-823983183ccd5a7e": 2,
+        "S-51dcb7914f9d6cd8": 18
+      },
+      "evidence": [
+        {
+          "record": "E-747e77bfd53f89c3",
+          "job": "J-e4b9e4a445e4ca80",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-10-21 13:18:49"
+        },
+        {
+          "record": "E-20bdb2cb43a5a82a",
+          "job": "J-847ba4f3e827c10f",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-14 08:00:41"
+        },
+        {
+          "record": "E-f7de769efd596d5d",
+          "job": "J-0ff8a7c4033c66c3",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-10-12 11:30:31"
+        },
+        {
+          "record": "E-aac75fd7c4a71fbd",
+          "job": "J-e4b9e4a445e4ca80",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-09 12:03:28"
+        },
+        {
+          "record": "E-344669c704af0e12",
+          "job": "J-0ff8a7c4033c66c3",
+          "staff": "S-c74d4b12250e049b",
+          "date": "2026-09-22 11:26:28"
+        }
+      ],
+      "uniqueJobs": 342
+    },
+    "issue_rectification": {
+      "count": 646,
+      "years": {
+        "2022": 21,
+        "2023": 288,
+        "2024": 90,
+        "2025": 134,
+        "2026": 113
+      },
+      "staff": {
+        "S-e3a4069bdc742c66": 373,
+        "S-826725e652325f44": 137,
+        "S-123ecae91a80d0c5": 25,
+        "S-396e9609aef741a4": 18,
+        "S-ab26daf4252e1cd5": 35,
+        "S-823983183ccd5a7e": 13,
+        "S-51dcb7914f9d6cd8": 45
+      },
+      "evidence": [
+        {
+          "record": "E-b7a4141b18c3940a",
+          "job": "J-7eb4c4518717086e",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-21 11:26:51"
+        },
+        {
+          "record": "E-d609fb466ee52c21",
+          "job": "J-38b0f278a375af04",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-16 14:18:59"
+        },
+        {
+          "record": "E-e43a1f8418db5443",
+          "job": "J-f620e844d61ac81a",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-13 15:15:37"
+        },
+        {
+          "record": "E-4303ad3759580b3d",
+          "job": "J-4b44748cd6b37530",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-13 14:34:17"
+        },
+        {
+          "record": "E-ebb259b87bc0e53d",
+          "job": "J-6b8f034985a0c5dd",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-12 12:14:57"
+        }
+      ],
+      "uniqueJobs": 423
+    },
+    "quote_revision": {
+      "count": 1052,
+      "years": {
+        "2022": 102,
+        "2023": 169,
+        "2024": 267,
+        "2025": 291,
+        "2026": 223
+      },
+      "staff": {
+        "S-826725e652325f44": 54,
+        "S-123ecae91a80d0c5": 83,
+        "S-e3a4069bdc742c66": 537,
+        "S-c74d4b12250e049b": 4,
+        "S-396e9609aef741a4": 143,
+        "S-ab26daf4252e1cd5": 204,
+        "S-51dcb7914f9d6cd8": 27
+      },
+      "evidence": [
+        {
+          "record": "E-a324618f09602b94",
+          "job": "J-089db7b0ed34fbc4",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-21 11:20:19"
+        },
+        {
+          "record": "E-11a88ebee94d6d4f",
+          "job": "J-6f43ba2b43ac9d0d",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-19 12:34:17"
+        },
+        {
+          "record": "E-47432f9fb31c28b1",
+          "job": "J-4e4d0f2610cb32e3",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-19 12:13:47"
+        },
+        {
+          "record": "E-eb80d4ddeaaed10f",
+          "job": "J-089db7b0ed34fbc4",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-14 13:33:55"
+        },
+        {
+          "record": "E-a58c718167a26fde",
+          "job": "J-d31a7bd9a12df955",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-14 11:52:18"
+        }
+      ],
+      "uniqueJobs": 614
+    },
+    "access_readiness": {
+      "count": 232,
+      "years": {
+        "2022": 71,
+        "2023": 21,
+        "2024": 32,
+        "2025": 47,
+        "2026": 61
+      },
+      "staff": {
+        "S-826725e652325f44": 59,
+        "S-e3a4069bdc742c66": 97,
+        "S-123ecae91a80d0c5": 12,
+        "S-396e9609aef741a4": 17,
+        "S-41da3074f6cb7aa5": 1,
+        "S-ab26daf4252e1cd5": 8,
+        "S-823983183ccd5a7e": 1,
+        "S-51dcb7914f9d6cd8": 37
+      },
+      "evidence": [
+        {
+          "record": "E-b89b1c3b1a8acb56",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 16:01:41"
+        },
+        {
+          "record": "E-af7a8181490e78d4",
+          "job": "J-f317e4836aef2148",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-08 15:21:03"
+        },
+        {
+          "record": "E-42252c61a6018b6b",
+          "job": "J-f3e9b5b48db306f6",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-08 11:17:51"
+        },
+        {
+          "record": "E-323592444096d9c3",
+          "job": "J-6759dbf36a48ad8f",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-05 13:40:19"
+        },
+        {
+          "record": "E-27fe4be63cf08adf",
+          "job": "J-f317e4836aef2148",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-09-30 16:07:27"
+        }
+      ],
+      "uniqueJobs": 174
+    },
+    "scope_variation": {
+      "count": 468,
+      "years": {
+        "2022": 58,
+        "2023": 113,
+        "2024": 83,
+        "2025": 108,
+        "2026": 106
+      },
+      "staff": {
+        "S-826725e652325f44": 61,
+        "S-e3a4069bdc742c66": 236,
+        "S-123ecae91a80d0c5": 36,
+        "S-396e9609aef741a4": 39,
+        "S-ab26daf4252e1cd5": 23,
+        "S-823983183ccd5a7e": 5,
+        "S-51dcb7914f9d6cd8": 68
+      },
+      "evidence": [
+        {
+          "record": "E-34d180580c235198",
+          "job": "J-fc3a4e147d89694d",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-20 13:27:41"
+        },
+        {
+          "record": "E-37d7e9f790016d63",
+          "job": "J-b3362f8ec6e31baf",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-14 15:22:21"
+        },
+        {
+          "record": "E-55e2d9a759bc3582",
+          "job": "J-6a93b7cc153ee40c",
+          "staff": "S-e3a4069bdc742c66",
+          "date": "2026-10-14 11:23:08"
+        },
+        {
+          "record": "E-dcbb4662a0cc2389",
+          "job": "J-f317e4836aef2148",
+          "staff": "S-826725e652325f44",
+          "date": "2026-10-13 15:00:39"
+        },
+        {
+          "record": "E-d26af0f92a46f679",
+          "job": "J-b4fd7c93c7f94f84",
+          "staff": "S-123ecae91a80d0c5",
+          "date": "2026-10-08 16:40:53"
+        }
+      ],
+      "uniqueJobs": 339
+    }
+  },
+  "byYear": {
+    "2022": 3356,
+    "2023": 4802,
+    "2024": 6065,
+    "2025": 7661,
+    "2026": 4551
+  },
+  "staff": {
+    "S-826725e652325f44": 3694,
+    "S-e3a4069bdc742c66": 11885,
+    "S-123ecae91a80d0c5": 1062,
+    "S-c74d4b12250e049b": 48,
+    "S-396e9609aef741a4": 2279,
+    "S-41da3074f6cb7aa5": 35,
+    "S-8688eea883a556bb": 9,
+    "S-ab26daf4252e1cd5": 2852,
+    "S-ef472d682f2e3d25": 671,
+    "S-823983183ccd5a7e": 750,
+    "S-51dcb7914f9d6cd8": 3149,
+    "S-4f694562a5ce2801": 1
+  },
+  "greetings": {
+    "hi": 16920,
+    "other": 8251,
+    "hey": 544,
+    "hello": 120,
+    "good morning": 88,
+    "dear": 203,
+    "good afternoon": 309
+  },
+  "depositPercentages": {
+    "5": 1,
+    "10": 2,
+    "20": 2,
+    "25": 3,
+    "30": 6,
+    "33": 1,
+    "35": 1,
+    "40": 2,
+    "47": 3,
+    "50": 134
+  },
+  "medianWords": 48,
+  "p90Words": 146,
+  "status": "complete",
+  "finishedAtUtc": "2026-10-23T03:36:14.578Z"
+}
