@@ -13,6 +13,11 @@ documents and the linked audits rather than reconstructing decisions from chat.
 
 ## Current checkpoint — 27 October 2026
 
+Owner decision on 27 October: [complete, staff-authorised Job history is now a hard MVP gate](history-policy-decisions.md#approved-mvp-coverage-decision--27-october-2026),
+including staging answers and drafts. The [local staging checkpoint](../audits/2026-10-27-local-staging-slice.md)
+records the chat-style presentation and the closed staging gate. No full-history reader has been
+verified or released; exact Job lookup remains the available staging check.
+
 The [local staging slice implementation record](../audits/2026-10-27-local-staging-slice.md)
 documents code added after the local unified-context verification. It is not a deployed or
 signed-staff acceptance result; the checkpoint table below remains the live evidence boundary.

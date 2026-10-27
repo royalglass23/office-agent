@@ -29,3 +29,20 @@ re-authorise the completed review.
 
 The model has not been trained or configured with these findings. This review does not clear the
 Office Agent's complete-Diary gate, create ServiceM8 writes or approve customer sends.
+
+## Approved MVP coverage decision — 27 October 2026
+
+Decision: The owner confirmed that a Job answer or draft in the MVP requires a complete,
+staff-authorised read of the selected Job's available ServiceM8 history, including Email, SMS,
+Notes, Calls, file contents, status changes and other Diary-only events. If relevant history is
+missing, unreadable or not provably complete, the Office Agent must withhold the Job output and
+direct staff to the ServiceM8 Diary. This applies to staging bounded checks as well as broader
+Job answers. It supersedes the earlier temporary staging exception for communication-only
+answers. Searching for an exact Job and viewing its current basic fields may remain available.
+
+Source and approval: owner instruction in the Office Agent Codex conversation on 27 October
+2026, following the explanation of the [unified live verification gaps](../audits/2026-10-27-unified-live-verification.md).
+Scope: Office Agent MVP Job answers and drafts. The decision does not approve account-key access,
+new OAuth scopes, ServiceM8 writes, automatic sending, production release or a claim that complete
+Diary retrieval is currently possible. Implementation status is tracked in the
+[local staging checkpoint](../audits/2026-10-27-local-staging-slice.md).

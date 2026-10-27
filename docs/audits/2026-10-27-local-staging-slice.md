@@ -40,3 +40,39 @@ This record advances the local code status after
 - `npm run build`: PASS; Next.js generated the new `/assistant/staging` dynamic route.
 
 No account-key live harness, ServiceM8 staff launch or deployed request was run for this change.
+
+## Presentation amendment — 27 October 2026
+
+The user requested that the staging answer read naturally without the visible Evidence quotes or
+Source coverage panels. This approved UI change removes those panels and the technical source
+label from the Job card. A short plain-language note still directs staff to the full ServiceM8
+Diary before acting because Calls and file contents may add context. The backend continues to
+validate source citations and exact quote anchors, requires complete supported communication
+reads, and withholds an answer when a required source is unavailable. This amendment changes
+presentation only; it does not establish new live staging evidence or relax the production gate.
+The local presentation check passed 9 focused tests, typecheck and targeted ESLint. No signed-staff
+browser check was run for this amendment.
+
+## Full-history MVP gate and chat presentation — 27 October 2026
+
+The owner confirmed complete, staff-authorised Job history as a hard condition for MVP Job
+answers and drafts, including the staging bounded checks. This supersedes the earlier bounded
+communication-answer exception. The staging POST now stops before source reading and OpenAI
+when the global Diary gate is closed, and also checks the selected Job's `diaryCoverage` before
+any answer if that global gate is later opened. Current code reports coverage as unverified, so
+no staging Job answer or draft is presently available. Exact Job lookup/current-field display
+remains available for testing access.
+
+The staging HTML now uses a one-turn chat layout: the chosen check appears as the staff message,
+and the result or block appears as the assistant reply. On submission, a spinner and live status
+show “Finding the Job…” or “Checking the full Job history…” until navigation completes. These
+are request-progress labels, not claims that a particular server step or OpenAI generation has
+started. The inline progress script has an exact CSP hash; no broad script permission was added.
+It is a presentation enhancement, not a persistent conversation or streaming server-status feed.
+The owner requested this interaction on 27 October 2026. At validation time, no commit, push,
+deployment, new source scope or signed-staff browser verification had been performed for this
+amendment.
+Local validation for this amendment: 66 focused route/gate tests passed; TypeScript typecheck and
+targeted ESLint passed. The second production build passed after the installed Next.js version
+displayed a security-upgrade reminder and stopped the first run. The spinner has not yet been
+verified inside the ServiceM8-hosted frame.

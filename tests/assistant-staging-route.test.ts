@@ -13,6 +13,7 @@ const fixture = vi.hoisted(() => {
     verifyAssistantSession: vi.fn(async () => ({ accountUUID, staffUUID, launchExpiresAt: Math.floor(Date.now() / 1000) + 300 })),
     consumeEventHash: vi.fn(async () => true),
     requireVendorAccount: vi.fn(async () => undefined),
+    isJobDiaryCoverageVerified: vi.fn(() => false),
     listJobsByNumber: vi.fn(async () => [{ uuid: jobUUID, jobNumber: "R260609" }]),
     getJob: vi.fn(async () => ({ uuid: jobUUID, jobNumber: "R260609", status: "Quote", address: "Example address" })),
     readRestJobContext: vi.fn(async () => ({ jobUUID, jobNumber: "R260609", sources: {
@@ -40,6 +41,7 @@ vi.mock("@/lib/servicem8/proof-reader", () => ({ ServiceM8ProofReader: class Ser
   listJobsByNumber = fixture.listJobsByNumber;
   getJob = fixture.getJob;
 } }));
+vi.mock("@/lib/servicem8/job-diary-gate", () => ({ isJobDiaryCoverageVerified: fixture.isJobDiaryCoverageVerified }));
 vi.mock("@/lib/servicem8/rest-job-context", () => ({ readRestJobContext: fixture.readRestJobContext }));
 vi.mock("@/lib/servicem8/unified-job-context", () => ({ buildUnifiedJobContext: fixture.buildUnifiedJobContext }));
 vi.mock("@/lib/servicem8/unified-job-agent", () => ({ answerUnifiedJobQuestion: fixture.answerUnifiedJobQuestion }));
@@ -54,7 +56,7 @@ function request(action: string, jobNumber = "R260609") {
 }
 
 describe("staging Job slice", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); fixture.isJobDiaryCoverageVerified.mockReturnValue(false); });
 
   it("denies a foreign account before any Job read", async () => {
     fixture.verifyAssistantSession.mockResolvedValueOnce({ accountUUID: "123e4567-cb72-4d94-8a1e-d454131257eb",
@@ -81,10 +83,34 @@ describe("staging Job slice", () => {
     expect(await response.text()).toContain("&lt;Open&gt;");
     expect(fixture.requireVendorAccount).toHaveBeenCalledWith(expect.anything(), fixture.accountUUID);
     expect(fixture.readRestJobContext).not.toHaveBeenCalled();
+    const html = await POST(request("view")).then((result) => result.text());
+    expect(html).toContain("Choose a bounded check");
+    expect(html).toContain('role="status" aria-live="polite" hidden');
+    expect(html).toContain("Finding the Job…");
+  });
+
+  it.each(["latest", "check", "draft"])("blocks %s before source reads or OpenAI while full history is unverified", async (action) => {
+    const response = await POST(request(action));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("The full ServiceM8 history has not been verified");
+    expect(html).toContain('class="bubble reply blocked"');
+    expect(fixture.readRestJobContext).not.toHaveBeenCalled();
+    expect(fixture.answerUnifiedJobQuestion).not.toHaveBeenCalled();
+  });
+
+  it("also blocks when a future global gate passes but this Job is unverified", async () => {
+    fixture.isJobDiaryCoverageVerified.mockReturnValue(true);
+    const response = await POST(request("latest"));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("This Job&#39;s full history could not be verified");
+    expect(fixture.answerUnifiedJobQuestion).not.toHaveBeenCalled();
   });
 
   it("withholds an answer if an active communication has no full body", async () => {
+    fixture.isJobDiaryCoverageVerified.mockReturnValue(true);
     const context = await fixture.readRestJobContext();
+    context.diaryCoverage = "verified";
     context.sources.email.events[0].contentState = "unavailable";
     fixture.readRestJobContext.mockResolvedValueOnce(context);
     const response = await POST(request("latest"));
@@ -92,19 +118,28 @@ describe("staging Job slice", () => {
     expect(fixture.answerUnifiedJobQuestion).not.toHaveBeenCalled();
   });
 
-  it("returns a cited answer only after the staff-bound parent and source reads", async () => {
+  it("returns a natural answer while keeping source validation behind the UI", async () => {
+    fixture.isJobDiaryCoverageVerified.mockReturnValue(true);
+    const context = await fixture.readRestJobContext();
+    context.diaryCoverage = "verified";
+    fixture.readRestJobContext.mockResolvedValueOnce(context);
     const response = await POST(request("latest"));
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain("Latest verified email");
-    expect(html).toContain("full ServiceM8 Diary is unverified");
-    expect(html).toContain("Recorded email quote");
+    expect(html).toContain("Check the full ServiceM8 Diary before acting");
+    expect(html).not.toContain("Recorded email quote");
+    expect(html).not.toContain("Evidence quotes");
+    expect(html).not.toContain("Source coverage");
+    expect(html).not.toContain("email:source");
     expect(fixture.buildUnifiedJobContext).toHaveBeenCalledWith(expect.anything(), []);
     expect(fixture.answerUnifiedJobQuestion).toHaveBeenCalledOnce();
   });
 
   it("requires the latest message and inbound reply citations", async () => {
+    fixture.isJobDiaryCoverageVerified.mockReturnValue(true);
     const context = await fixture.readRestJobContext();
+    context.diaryCoverage = "verified";
     context.sources.email.events.push({ source: "email", sourceId: "reply", active: true,
       contentState: "full", timestamp: "2026-10-02 12:00:00", direction: "inbound" });
     fixture.readRestJobContext.mockResolvedValueOnce(context);
@@ -113,5 +148,22 @@ describe("staging Job slice", () => {
     fixture.answerUnifiedJobQuestion.mockResolvedValueOnce({ answer: "Reply", subject: "", body: "",
       citations: ["email:source", "email:reply"], anchors: [], gaps: [] });
     expect((await POST(request("latest"))).status).toBe(200);
+  });
+
+  it("shows an editable draft without technical source panels", async () => {
+    fixture.isJobDiaryCoverageVerified.mockReturnValue(true);
+    const context = await fixture.readRestJobContext();
+    context.diaryCoverage = "verified";
+    fixture.readRestJobContext.mockResolvedValueOnce(context);
+    fixture.answerUnifiedJobQuestion.mockResolvedValueOnce({ answer: "", subject: "Checking in", body: "Can you confirm?",
+      citations: ["email:source"], anchors: [{ id: "email:source", quote: "Recorded email quote" }], gaps: [] });
+    const response = await POST(request("draft"));
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('value="Checking in"');
+    expect(html).toContain("<textarea id=\"body\" rows=\"10\">Can you confirm?</textarea>");
+    expect(html).toContain("Nothing is sent or saved to ServiceM8");
+    expect(html).not.toContain("Recorded email quote");
+    expect(html).not.toContain("Source coverage");
   });
 });

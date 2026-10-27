@@ -58,6 +58,7 @@ export async function answerUnifiedJobQuestion(
         "When no Diary inventory is supplied, the full Diary and calls are unverified. Limit latest claims to verified accessible Email/SMS/Note records.",
         "Do not claim attachment, photo, call, schedule or payment content was read.",
         "Cite the supplied evidence ids that directly support the answer. Never invent an id or unsupported event.",
+        "Keep the answer and draft natural. Put source ids and exact quote anchors only in their structured fields, never in the answer, subject or body.",
         "For every citation, give one anchor with that id and an exact 8-300 character quote copied from its evidence text.",
         "For email_draft, give a useful question-focused, review-only subject and body with at least one explicit question ending in a question mark. Do not imply it was sent.",
         "If the evidence says work and payment are complete, ask whether everything is satisfactory or any issue remains; do not request an irrelevant project progress update.",
