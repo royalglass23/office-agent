@@ -76,3 +76,18 @@ Local validation for this amendment: 66 focused route/gate tests passed; TypeScr
 targeted ESLint passed. The second production build passed after the installed Next.js version
 displayed a security-upgrade reminder and stopped the first run. The spinner has not yet been
 verified inside the ServiceM8-hosted frame.
+
+## Bounded staging checks restored — 27 October 2026
+
+The owner clarified that all three bounded staging checks should keep working for pilot testing,
+with a visible limited-history label. The staging-only full-Diary gate from the preceding
+amendment was removed; `/assistant/staging` again reads the staff-authorised REST Job context and
+can call OpenAI for the three fixed questions after the existing complete communication-text,
+parent-Job, source-status and evidence checks. The broader `/assistant` Job gate remains closed.
+The chat UI states before selection that only available emails, texts and notes are used and that
+Calls, file contents and other Diary events are not checked. Submission progress now says it is
+reading available messages and notes, not the full history.
+
+This is a local correction to the pilot scope, not proof of complete Job history or a deployed
+change. Focused route/gate tests: 65 passed; typecheck and targeted ESLint passed. Signed-staff
+browser behaviour and the progress indicator still need staging verification.

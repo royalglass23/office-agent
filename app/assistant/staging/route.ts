@@ -4,7 +4,6 @@ import { assistantRateLimit, assistantSessionHash, issueAssistantSession, verify
 import { correlationId, safeLog } from "@/lib/security/safe-log";
 import { ServiceM8Client, requireVendorAccount } from "@/lib/servicem8/client";
 import { ServiceM8ProofReader } from "@/lib/servicem8/proof-reader";
-import { isJobDiaryCoverageVerified } from "@/lib/servicem8/job-diary-gate";
 import { readRestJobContext } from "@/lib/servicem8/rest-job-context";
 import { buildUnifiedJobContext } from "@/lib/servicem8/unified-job-context";
 import { answerUnifiedJobQuestion } from "@/lib/servicem8/unified-job-agent";
@@ -85,16 +84,8 @@ export async function POST(request: Request) {
     if (job.uuid !== matches[0].uuid || job.jobNumber !== form.jobNumber) throw new Error("Parent Job mismatch");
     const jobView = { jobNumber: job.jobNumber, status: job.status, address: job.address };
     if (form.action === "view") return response({ ...base, job: jobView });
-    if (!isJobDiaryCoverageVerified()) {
-      return response({ ...base, job: jobView, action: form.action,
-        error: "I can't give a Job answer yet. The full ServiceM8 history has not been verified. Review the Job Diary in ServiceM8." });
-    }
     const context = await readRestJobContext(client, job.uuid);
     if (context.jobNumber !== form.jobNumber || context.jobUUID !== job.uuid) throw new Error("Context parent mismatch");
-    if (context.diaryCoverage !== "verified") {
-      return response({ ...base, job: jobView, action: form.action,
-        error: "I can't give a Job answer yet. This Job's full history could not be verified. Review the Job Diary in ServiceM8." });
-    }
     for (const source of ["email", "sms", "notes"] as const) {
       const result = context.sources[source];
       if (result.status !== "complete" || result.events.some((event) => event.active !== false &&

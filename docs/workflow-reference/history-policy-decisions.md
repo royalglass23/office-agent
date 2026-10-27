@@ -46,3 +46,17 @@ Scope: Office Agent MVP Job answers and drafts. The decision does not approve ac
 new OAuth scopes, ServiceM8 writes, automatic sending, production release or a claim that complete
 Diary retrieval is currently possible. Implementation status is tracked in the
 [local staging checkpoint](../audits/2026-10-27-local-staging-slice.md).
+
+## Staging pilot clarification — 27 October 2026
+
+The owner clarified that the three bounded staging checks should remain usable during testing
+with a visible **limited history** label. They use available Email, SMS and Note text for the
+selected Job; they do not establish complete Call, file, status-change or Diary-only coverage.
+The checks remain read-only or copy-only, require their existing source and citation validations,
+and direct staff to the full ServiceM8 Diary before acting. This supersedes the staging portion
+of the preceding hard-gate decision. The complete, staff-authorised history gate still applies
+to the final MVP and the broader Job answer/draft paths.
+
+Source and approval: owner reply in the Office Agent Codex conversation on 27 October 2026,
+selecting “Yes, keep bounded checks working” with a limited-history label. Scope: the three
+staging actions only; no new ServiceM8 source, sending, deployment or production release approved.
