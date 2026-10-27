@@ -2,8 +2,12 @@
 
 Status: Published for owner and staff review in [Linear RG-375](https://linear.app/royalglass/issue/RG-375/rg-office-assistant-phase-2-prd)<br>
 Date: 19 October 2026<br>
+
+Local documentation amendment, 27 October 2026: three unapproved report-design questions were
+carried here from the retired R1–R3 brainstorming handoff. This local edit does not amend Linear
+RG-375 or approve those questions as delivery scope.
 Scope: Five capabilities, supported by expanded read-only Job history<br>
-Source: Owner's Phase 2 discussion and Roxy's capability list in [roxy-office-agent-ideas.md](roxy-office-agent-ideas.md)
+Source: Owner's Phase 2 discussion and Roxy's [original capability list](workflow-reference/roxy-capability-ideas.md)
 
 ## Problem Statement
 
@@ -181,7 +185,10 @@ No numeric target is set until a baseline and a small staff evaluation set have 
 7. Property context should prioritise site details relevant to glass and pools: authoritative address, parcel, aerial view and visible project features. Homes.co.nz is unsuitable as an automated commercial source without permission under its current terms; select permitted LINZ, council or licensed sources for the chosen facts.
 8. Confirm which construction company types and example projects best represent Royal Glass's prospective collaborators; exclude profiles of individual people.
 9. Project evidence and public reviews are both wanted and must stay separate. Which review sites and project examples should be included in the first acceptance set, and how will staff flag a mistaken attribution? Which supplier-provided references and documents should Royal Glass ask for before a partnership decision?
+10. Should staff be able to add reference-call findings, meeting notes, a trial-project outcome and a later staff decision to a company report? This was an unapproved R1–R3 brainstorm question. If adopted, define edit access and keep staff follow-up separate from immutable public-source snapshots.
+11. Would a restrained overall report status such as “Explore” or “Verify first” help staff, or should the report show only fit, friction and unresolved questions? No overall status or score is approved by this PRD.
+12. Are attributed source-page links sufficient for project photos at first release, or is inline display needed? Any inline display or AI processing needs a source-specific rights and processing decision before implementation.
 
 ### Existing boundary and source note
 
-The current implementation reads core Job/customer fields and notes for the initial proof and constructs a review-only email draft and summary from that bounded evidence. The owner has now identified that this coverage is inadequate before using either output operationally; this document records the required gate but does not itself disable the existing route. This PRD proposes a broader source set; it does not claim those reads or AI analyses are implemented, granted or live-tested. The older [Job Diary design](job-diary-summary-design.md) records the Phase 1 boundary and an earlier API review that predates the currently documented [Job email list](https://developer.servicem8.com/reference/listemailmessages). The [Phase 2 source verification note](research/phase-2-source-verification.md) maps the documented read surfaces and public-source constraints; it is desk research, not Royal Glass UI/API parity proof. ServiceM8's current [scope list](https://developer.servicem8.com/docs/authentication) includes `read_email`, `read_inbox`, `read_schedule`, photo and attachment scopes; returned content and UI parity still require a fresh source audit.
+The current implementation reads core Job/customer fields and notes for the initial proof and constructs a review-only email draft and summary from that bounded evidence. The owner has now identified that this coverage is inadequate before using either output operationally; this document records the required gate but does not itself disable the existing route. This PRD proposes a broader source set; it does not claim those reads or AI analyses are implemented, granted or live-tested. The later [Job Context audit](audits/2026-10-27-job-context-verification.md) records why full-history coverage remains unproved. The [Phase 2 source verification note](research/phase-2-source-verification.md) maps the documented read surfaces and public-source constraints; it is desk research, not Royal Glass UI/API parity proof. ServiceM8's current [scope list](https://developer.servicem8.com/docs/authentication) includes `read_email`, `read_inbox`, `read_schedule`, photo and attachment scopes; returned content and UI parity still require a fresh source audit.

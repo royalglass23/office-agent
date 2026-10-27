@@ -46,6 +46,21 @@ not resolve their staging, staff-binding or complete-history gaps. The 21 Octobe
 record and 23 October research remain dated references; use the later reports for what was
 subsequently tested. This index summarizes saved reports; updating it did not rerun the live tests.
 
+### Earlier gate and staging evidence
+
+- [Local staging slice](../audits/2026-10-27-local-staging-slice.md): local implementation
+  checkpoint after the live checks; signed-staff staging acceptance remains outstanding.
+- [RG-380 coverage decision](../audits/RG-380-job-diary-coverage.md): the 20 October NO-GO,
+  UI/source fixture matrix and unresolved read paths.
+- [RG-380 MCP staging probe](../audits/RG-380-mcp-staging-probe.md): separate OAuth registration,
+  deployed probe and redacted R260609/R260611 inventory results. Its count matches do not
+  establish complete Diary content or staff binding.
+- [Global-menu gate](../audits/2026-10-13-global-menu-gate.md): the earlier signed-staff Phase 0
+  acceptance record and its dated staging and production checks.
+
+These reports retain their original scope and dates. The 27 October checks advance the local
+Job-context evidence; they do not replace the RG-380 access history or the Phase 0 gate record.
+
 ## How to keep this reference current
 
 1. Read this checkpoint, the relevant business document and the latest applicable audit before
@@ -66,9 +81,6 @@ older planning chart. Existing repository instructions and explicit user authori
 
 ## Start here
 
-- [Shareable history findings report](servicem8-history-findings.pdf) and
-  [plain-text version](servicem8-history-findings.txt): generated 27 October 2026 from the existing
-  23 October research snapshot, with candidate rules, response patterns, policy questions and evidence.
 - [ServiceM8 history findings](history-findings.md): completed all-staff source review through
   23 October 2026, 16:29:22 Pacific/Auckland; 12 candidate decision rules and policy conflicts.
 - [Client response patterns and next actions](history-response-patterns.md): nine draft patterns
@@ -84,6 +96,10 @@ older planning chart. Existing repository instructions and explicit user authori
 - [Original complete chart](workflow-full.svg): scalable version of the user's supplied chart.
 - [Recommended architecture](workflow-architecture.svg).
 - [Business logic and questions for Roxy](business-logic-and-roxy.md).
+- [Original Roxy capability ideas](roxy-capability-ideas.md): source suggestions, not approved scope.
+- [Assistant architecture discussion](assistant-architecture.md): dated planning direction and open decisions.
+- [Top View Construction pilot](../research/company-background-pilot-top-view.md): the selected
+  public-source example for the company-report acceptance set, dated 19 October 2026.
 - [ServiceM8 history review requirements](history-review-requirements.md).
 
 ## Charts and editable sources
@@ -149,7 +165,7 @@ review and does not establish a complete staff-bound UI Diary or enable applicat
 
 Existing implementation references:
 
-- [Architecture handoff](../office-agent-architecture-handoff.md).
+- [Architecture discussion](assistant-architecture.md).
 - [RG-381 readiness](../research/rg381-diary-readiness.md).
 - [RG-380 audit](../audits/RG-380-job-diary-coverage.md).
 - [Diary gate](../../lib/servicem8/job-diary-gate.ts).
@@ -182,7 +198,7 @@ The original chart/share exports are in
 | `can-2-chart-files.zip` | Original chart bundle for sharing. |
 | `office-agent-chatgpt-context.txt` | Combined reference text prepared 27 October from the earlier saved documents. |
 | `office-agent-reference-files.zip` | Reference sharing snapshot; it does not automatically include later report or audit additions. |
-| `servicem8-history-findings.pdf` and `.txt` | Shareable history report; copies are indexed in this repository above. Research cutoff remains 23 October. |
+| `servicem8-history-findings.pdf` and `.txt` | Frozen share exports from the 23 October research snapshot. The repository copies were retired on 27 October 2026; use the linked research and decision records above for current review. |
 
 These exports are frozen copies, not the current project checkpoint. Regenerate a sharing package
 when newer decisions/audits need to travel with it. The original `work` folder contains scratch
@@ -191,6 +207,13 @@ credentials and raw customer evidence out of reference documents and sharing pac
 
 ### Reference update log
 
+- **27 October 2026:** cleaned the repository reference set. Retained the published Phase 2 PRD,
+  accepted ADRs, dated audits, current source research, original Roxy ideas and editable workflow
+  charts. Moved the Phase 0 gate evidence into audits and the architecture discussion into this
+  folder. Retired the superseded Phase 2 drafts, early feasibility and Notes-only design, duplicate
+  history exports and MCP note, the RG-380 handoff and the earlier Watchman Pools pilot. Carried
+  three unapproved report questions into the local PRD and marked ADR 0006's later gate. No live
+  source was reread, Linear issue changed or application behaviour altered.
 - **27 October 2026:** consolidated the file index, linked the three current verification reports,
   recorded approval/readiness limits and added repository entry points in `AGENTS.md`, the root
   README and architecture handoff. No new live verification was performed for this index update.

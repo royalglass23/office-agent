@@ -5,6 +5,13 @@ date: 2026-10-20
 
 # Offer bounded Job advice in the Office Assistant conversation
 
+Current applicability (27 October 2026): this ADR records the accepted conversational intent and
+the earlier bounded proof. Its partial-record Job advice and draft path is held by the later
+[full-history MVP decision](../workflow-reference/history-policy-decisions.md#approved-mvp-coverage-decision--27-october-2026).
+Only the three explicitly limited staging checks have the separate
+[pilot exception](../workflow-reference/history-policy-decisions.md#staging-pilot-clarification--27-october-2026).
+This annotation records the later owner decisions; it does not approve a new capability.
+
 The owner wants Office Agent to work like a Royal Glass chat assistant inside ServiceM8. Staff
 may ask what to do next for one selected Job. An email draft appears only when staff ask for an
 email. The assistant does not require staff to choose a recipient before it recommends a next

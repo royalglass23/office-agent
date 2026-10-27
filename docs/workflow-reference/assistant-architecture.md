@@ -1,4 +1,4 @@
-# RG Office Agent — Assistant Architecture Handoff
+# RG Office Agent — Assistant Architecture Discussion
 
 Status: **Planning only — no implementation authority**
 Repository: `D:\Royal Glass Dev\office-agent`
@@ -6,7 +6,7 @@ Branch observed: `dev`
 Prepared: 21 October 2026
 
 For the saved files and newer evidence, start with the
-[project reference index](workflow-reference/README.md). This handoff preserves the architecture
+[project reference index](README.md). This document preserves the architecture
 discussion from 21 October; it is not the latest verification status.
 
 ## Purpose
@@ -310,8 +310,12 @@ This handoff is a new documentation file only. No tests were required for the do
 addition. Nothing was committed, pushed, deployed, migrated, or changed in ServiceM8, OpenAI, the
 database, or Linear.
 
+The RG-380 to RG-381 handoff named above was retired during the 27 October 2026 document cleanup.
+Its audit evidence and current follow-up are retained in the linked RG-380 audit and RG-381
+readiness record. The list describes the repository at this handoff's creation.
+
 ## Suggested next-session instruction
 
-> Read `docs/office-agent-architecture-handoff.md` and the existing RG-380/RG-381 evidence. Continue
+> Read `docs/workflow-reference/assistant-architecture.md` and the existing RG-380/RG-381 evidence. Continue
 > the architecture discussion from the first unresolved decision. Do not implement, migrate, change
 > OAuth scopes, deploy, commit, push, or advance a gate unless I explicitly authorise that action.

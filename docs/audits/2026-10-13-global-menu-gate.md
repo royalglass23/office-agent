@@ -1,10 +1,17 @@
-# Phase 0 live runbook
+# Historical global-menu gate and Phase 0 evidence
+
+Status: dated evidence record from 13 October 2026. The provisioning and repeat-test steps below
+describe that earlier proof; use the current workflow index and code for present readiness. This
+file was moved from `docs/phase-0-runbook.md` during the 27 October document cleanup so its
+signed-staff acceptance and gate decision remain traceable.
+
+The original runbook text follows as historical evidence.
 
 This runbook closes the live evidence that local tests cannot prove. A deployment is not a Phase 0
 GO until every required row below has redacted evidence and no stop condition is triggered.
 
 This is the original three-scope Phase 0 runbook. The later Job Diary Notes scope change is tracked
-in `docs/job-diary-summary-design.md`; do not use this provisioning section to configure that
+in `docs/audits/RG-380-job-diary-coverage.md`; do not use this provisioning section to configure that
 four-scope release.
 
 ## Provisioning

@@ -3,7 +3,7 @@
 ## Current gate
 
 The authoritative product gate is the committed Phase 0 `PASS` in
-`docs/phase-0-runbook.md`, followed by the owner's explicit 13 October 2026 instruction to start
+`docs/audits/2026-10-13-global-menu-gate.md`, followed by the owner's explicit 13 October 2026 instruction to start
 Phase 1. The authorised slice is a single-account, global Add-ons-menu, staff-bound conversation
 using only the already accepted “What happened?” and review-only Email Draft proofs.
 

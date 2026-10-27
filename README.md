@@ -18,9 +18,10 @@ The local staging slice is disabled by default. On the exact
 existing assistant proof controls makes the signed global Add-ons-menu launch show an exact Job
 lookup and three read-only communication checks. The backend uses the signed staff/account session
 and existing OAuth `ServiceM8Client`; it does not use the local account key. Every request checks
-the parent Job before reading child records. Answers and editable drafts cite full REST
-Email/SMS/Note sources and show the unverified Diary/call/file gaps. The global RG-380 Job-output
-gate remains closed. There is no ServiceM8 write or send action.
+the parent Job before reading child records. The backend validates citations against full REST
+Email/SMS/Note text. The staging UI labels the limited history used for those checks; Calls,
+file contents and other Diary events remain unchecked. The global RG-380 Job-output gate remains
+closed. There is no ServiceM8 write or send action.
 
 This code has not been deployed or tested through a signed-in ServiceM8 staging launch. The known
 “Invalid Response Received” launch must be diagnosed with the actual add-on registration/callback
@@ -60,8 +61,9 @@ organisation's data controls, then set `ASSISTANT_PROOF_ENABLED=true`, `OPENAI_A
 `OPENAI_MODEL`, and `OPENAI_DATA_CONTROLS_VERIFIED=true`. Enabling the code does not deploy it,
 upload the updated ServiceM8 manifest, or constitute live evidence.
 
-Follow [the Phase 0 runbook](docs/phase-0-runbook.md) and record redacted Michael/Carla evidence
-before treating the production proof as successful.
+The [dated global-menu gate record](docs/audits/2026-10-13-global-menu-gate.md) preserves the
+13 October Michael/Carla acceptance evidence. Check the current workflow index and live deployment
+before treating any present proof as successful.
 
 ## Company checks
 

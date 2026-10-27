@@ -1,10 +1,14 @@
 # Office Agent capability ideas
 
+Original owner-supplied Roxy capability list and candidate expansion ideas, moved from
+`docs/roxy-office-agent-ideas.md` on 27 October 2026. These are source ideas, not approved
+scope; use the published Phase 2 PRD for the five selected capabilities.
+
 ## Phase 2 candidate list
 
 Phase 2 can make the Office Agent useful across several office tasks. The owner has expressed particular interest in email drafting and the one-URL background check; these lead the candidate list, but they are not the whole phase. The order below is a proposal for discussion, not an approved implementation scope.
 
-The five starting capabilities and expanded Job history are detailed in the [Phase 2 PRD](phase-2-prd.md).
+The five starting capabilities and expanded Job history are detailed in the [Phase 2 PRD](../phase-2-prd.md).
 
 ### Start with useful reviewable work
 
